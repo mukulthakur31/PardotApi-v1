@@ -66,24 +66,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const encodedToken = urlParams.get("token");
     const googleAuthSuccess = urlParams.get("google_auth");
-
-    if (encodedToken) {
-      try {
-        const decodedToken = decodeURIComponent(encodedToken);
-        setToken(decodedToken);
-      } catch (err) {
-        console.error("Error decoding token:", err);
-      }
-    }
 
     if (googleAuthSuccess === "success") {
       setGoogleAuth(true);
     }
 
+    // Get token securely from session
+    getTokenFromSession();
     checkGoogleAuthStatus();
   }, []);
+
+  const getTokenFromSession = async () => {
+    try {
+      const response = await axios.get("http://localhost:4000/get-token");
+      setToken(response.data.token);
+    } catch (err) {
+      console.error("Error getting token:", err);
+      // Redirect to setup if no token found
+      window.location.href = "/";
+    }
+  };
 
   const checkGoogleAuthStatus = async () => {
     try {
@@ -137,7 +140,7 @@ export default function Dashboard() {
         const url = window.URL.createObjectURL(new Blob([res.data]));
         const link = document.createElement("a");
         link.href = url;
-        link.setAttribute("download", "email_stats.pdf");
+        link.setAttribute("download", "email_campaign_report.pdf");
         document.body.appendChild(link);
         link.click();
       })

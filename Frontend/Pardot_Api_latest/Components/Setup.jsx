@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function Home() {
+export default function Setup() {
   const [formData, setFormData] = useState({
     clientId: '',
     clientSecret: '',
@@ -10,9 +10,12 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    // Basic input sanitization
+    const sanitizedValue = value.trim().replace(/[<>"'&]/g, '');
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: sanitizedValue
     });
   };
 
@@ -22,29 +25,46 @@ export default function Home() {
     setMessage('');
 
     try {
-      const response = await fetch('http://localhost:4000/setup', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(`${apiUrl}/setup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest' // CSRF protection
+        },
         credentials: 'include',
+        signal: controller.signal,
         body: JSON.stringify({
           client_id: formData.clientId,
           client_secret: formData.clientSecret,
           business_unit_id: formData.businessUnitId
         })
       });
+      
+      clearTimeout(timeoutId);
 
       const result = await response.json();
 
       if (response.ok) {
         setMessage('Setup successful! Redirecting to login...');
         setTimeout(() => {
-          window.location.href = 'http://localhost:4000/login';
+          window.location.href = `${apiUrl}/login`;
         }, 2000);
       } else {
-        setMessage(`Error: ${result.error}`);
+        // Don't expose detailed error messages
+        setMessage('Setup failed. Please check your credentials and try again.');
       }
     } catch (error) {
-      setMessage(`Connection failed: ${error.message}`);
+      if (error.name === 'AbortError') {
+        setMessage('Request timeout. Please try again.');
+      } else {
+        setMessage('Connection failed. Please check your network and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +121,7 @@ export default function Home() {
         }}>
           <strong>Setup Instructions:</strong><br/>
           1. Create a Connected App in Salesforce<br/>
-          2. Callback URL: http://localhost:4000/callback<br/>
+          2. Callback URL: {process.env.REACT_APP_API_URL || 'http://localhost:5000'}/callback<br/>
           3. Scopes: pardot_api, full
         </div>
 
@@ -119,6 +139,7 @@ export default function Home() {
               value={formData.clientId}
               onChange={handleInputChange}
               placeholder="Enter your Client ID"
+              maxLength="100"
               required
               style={{
                 width: "100%",
@@ -146,6 +167,8 @@ export default function Home() {
               value={formData.clientSecret}
               onChange={handleInputChange}
               placeholder="Enter your Client Secret"
+              maxLength="200"
+              autoComplete="new-password"
               required
               style={{
                 width: "100%",
@@ -173,6 +196,7 @@ export default function Home() {
               value={formData.businessUnitId}
               onChange={handleInputChange}
               placeholder="Enter your Business Unit ID"
+              maxLength="50"
               required
               style={{
                 width: "100%",

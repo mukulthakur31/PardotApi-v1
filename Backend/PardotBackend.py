@@ -120,33 +120,47 @@ def get_email_stats():
         month = request.args.get("month")
         year = request.args.get("year")
         
+        print(f"Fetching emails with params: day={day}, month={month}, year={year}")
+        
         emails = fetch_all_mails(access_token, day=day, month=month, year=year)
+        print(f"Found {len(emails)} emails")
+        
         stats_list = fetch_email_stats_parallel(access_token, emails)
+        print(f"Processed stats for {len(stats_list)} emails")
         
         return jsonify(stats_list)
     except Exception as e:
+        print(f"Error in get_email_stats: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@app.route("/download-pdf", methods=["GET"])
+@app.route("/download-pdf", methods=["POST"])
 def download_pdf():
-    access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token is required"}), 401
-
     try:
-        # Get date range parameters
-        day = request.args.get("day")
-        month = request.args.get("month")
-        year = request.args.get("year")
+        data_type = request.json.get("data_type", "emails")
+        data = request.json.get("data")
         
-        # Fetch email data
-        emails = fetch_all_mails(access_token, day=day, month=month, year=year)
-        stats_list = fetch_email_stats_parallel(access_token, emails)
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
         
-        # Generate professional PDF
-        buffer = create_professional_pdf_report(stats_list, day, month, year)
+        if data_type == "emails":
+            filters = request.json.get("filters", {})
+            day = filters.get("day")
+            month = filters.get("month")
+            year = filters.get("year")
+            buffer = create_professional_pdf_report(data, day, month, year)
+            filename = "email_campaign_report.pdf"
+        elif data_type == "forms":
+            buffer = create_form_pdf_report(data)
+            filename = "form_stats_report.pdf"
+        elif data_type == "prospects":
+            buffer = create_prospect_pdf_report(data)
+            filename = "prospect_health_report.pdf"
+        else:
+            return jsonify({"error": "Invalid data type"}), 400
         
-        return send_file(buffer, as_attachment=True, download_name="email_campaign_report.pdf", mimetype="application/pdf")
+        return send_file(buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -163,6 +177,8 @@ def get_form_stats():
             "Pardot-Business-Unit-Id": credentials['business_unit_id']
         }
         
+        print(f"Fetching forms and activities with headers: {headers}")
+        
         with ThreadPoolExecutor(max_workers=2) as executor:
             forms_future = executor.submit(
                 requests.get,
@@ -175,10 +191,14 @@ def get_form_stats():
             forms_response = forms_future.result()
             activities = activities_future.result()
         
+        print(f"Forms response status: {forms_response.status_code}")
+        print(f"Activities count: {len(activities) if activities else 0}")
+        
         if forms_response.status_code != 200:
             return jsonify({"error": f"Error fetching forms: {forms_response.text}"}), 500
         
         forms = forms_response.json().get("values", [])
+        print(f"Found {len(forms)} forms")
         
         # Group activities by form_id
         activities_by_form = defaultdict(list)
@@ -187,13 +207,19 @@ def get_form_stats():
             if form_id:
                 activities_by_form[form_id].append(activity)
         
+        print(f"Activities grouped by {len(activities_by_form)} forms")
+        
         # Calculate stats in parallel
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(calculate_form_stats, form, activities_by_form) for form in forms]
             form_stats = [future.result() for future in futures]
         
+        print(f"Calculated stats for {len(form_stats)} forms")
         return jsonify(form_stats)
     except Exception as e:
+        print(f"Error in get_form_stats: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # ===== Google Integration Routes =====
@@ -231,10 +257,6 @@ def google_callback():
 
 @app.route("/export-to-sheets", methods=["POST"])
 def export_to_sheets():
-    access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token is required"}), 401
-    
     if not session.get('google_credentials'):
         return jsonify({"error": "Google authentication required"}), 401
     
@@ -246,15 +268,13 @@ def export_to_sheets():
             json.loads(session['google_credentials'])
         )
         
-        day = request.json.get("day")
-        month = request.json.get("month")
-        year = request.json.get("year")
-        title = request.json.get("title", "Email Stats")
+        title = request.json.get("title", "Stats")
+        export_data = request.json.get("data", [])
         
-        emails = fetch_all_mails(access_token, day=day, month=month, year=year)
-        stats_list = fetch_email_stats_parallel(access_token, emails)
+        if not export_data:
+            return jsonify({"error": "No data provided"}), 400
         
-        spreadsheet_id = google_integration.create_spreadsheet(credentials, title, stats_list)
+        spreadsheet_id = google_integration.create_spreadsheet(credentials, title, export_data)
         
         return jsonify({
             "success": True,
@@ -268,6 +288,118 @@ def export_to_sheets():
 def google_auth_status():
     return jsonify({"authenticated": bool(session.get('google_credentials'))})
 
+@app.route("/get-prospect-health", methods=["GET"])
+def get_prospect_health():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        prospects = fetch_all_prospects(headers)
+        health_data = analyze_prospect_health(prospects, headers)
+        
+        return jsonify(health_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-inactive-prospects", methods=["GET"])
+def get_inactive_prospects():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        prospects = fetch_all_prospects(headers)
+        inactive_prospects = find_inactive_prospects(prospects)
+        
+        return jsonify({
+            "total_inactive": len(inactive_prospects),
+            "inactive_prospects": inactive_prospects
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-duplicate-prospects", methods=["GET"])
+def get_duplicate_prospects():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        prospects = fetch_all_prospects(headers)
+        duplicates = find_duplicate_prospects(prospects)
+        
+        return jsonify({
+            "total_duplicate_groups": len(duplicates),
+            "duplicate_prospects": duplicates
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-missing-fields-prospects", methods=["GET"])
+def get_missing_fields_prospects():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        prospects = fetch_all_prospects(headers)
+        missing_fields = find_missing_critical_fields(prospects)
+        
+        return jsonify({
+            "total_with_missing_fields": len(missing_fields),
+            "prospects_missing_fields": missing_fields
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-scoring-issues-prospects", methods=["GET"])
+def get_scoring_issues_prospects():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        prospects = fetch_all_prospects(headers)
+        scoring_issues = find_scoring_inconsistencies(prospects)
+        
+        return jsonify({
+            "total_scoring_issues": len(scoring_issues),
+            "prospects_with_scoring_issues": scoring_issues
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/get-token", methods=["GET"])
 def get_token():
     """Secure endpoint to get access token from session"""
@@ -276,44 +408,301 @@ def get_token():
         return jsonify({"error": "No access token found"}), 401
     return jsonify({"token": access_token})
 
-# ===== Helper Functions =====
-def fetch_all_mails(access_token, fields="id,name,subject,createdAt", day=None, month=None, year=None):
-    credentials = get_credentials()
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Pardot-Business-Unit-Id": credentials['business_unit_id']
+# ===== Prospect Health Functions =====
+def fetch_all_prospects(headers):
+    """Fetch all prospects with pagination"""
+    all_prospects = []
+    url = "https://pi.pardot.com/api/v5/objects/prospects"
+    params = {
+        "fields": "id,email,firstName,lastName,country,jobTitle,score,grade,lastActivityAt,createdAt",
+        "limit": 200
     }
     
-    # Calculate date threshold
-    if day and month and year:
-        try:
-            start_date = datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
-        except ValueError:
-            return []
-    else:
-        now = datetime.now(timezone.utc)
-        start_date = datetime(now.year, 1, 1, tzinfo=timezone.utc)
-
-    date_threshold = start_date.isoformat().replace("+00:00", "Z")
-    
-    # Fetch emails with pagination
-    all_mails = []
-    url = "https://pi.pardot.com/api/v5/objects/list-emails"
-    params = {"fields": fields, "limit": 200}
-    
     while url:
-        response = requests.get(url, headers=headers, params=params if url.endswith("list-emails") else None)
+        print(f"Fetching prospects from: {url}")
+        response = requests.get(url, headers=headers, params=params if url.endswith("prospects") else None)
+        
         if response.status_code != 200:
+            print(f"Error fetching prospects: {response.status_code} - {response.text}")
             break
-
+            
         data = response.json()
-        for email in data.get("values", []):
-            if email.get("createdAt") > date_threshold:
-                all_mails.append(email)
-
+        prospects = data.get("values", [])
+        all_prospects.extend(prospects)
+        
         url = data.get("nextPageUrl")
+        params = None  # Clear params for subsequent requests
+        
+        # Limit to prevent timeout (remove this in production)
+        if len(all_prospects) >= 2000:
+            break
+    
+    return all_prospects
 
-    return all_mails
+def analyze_prospect_health(prospects, headers):
+    """Analyze prospect database health"""
+    from datetime import datetime, timedelta
+    
+    # Initialize counters
+    duplicates = find_duplicate_prospects(prospects)
+    inactive_prospects = find_inactive_prospects(prospects)
+    missing_fields = find_missing_critical_fields(prospects)
+    scoring_issues = find_scoring_inconsistencies(prospects)
+    grading_analysis = analyze_grading_setup(prospects)
+    
+    return {
+        "total_prospects": len(prospects),
+        "duplicates": {
+            "count": len(duplicates),
+            "details": duplicates[:50]  # Limit to first 50 for performance
+        },
+        "inactive_prospects": {
+            "count": len(inactive_prospects),
+            "details": inactive_prospects[:50]
+        },
+        "missing_fields": {
+            "count": len(missing_fields),
+            "details": missing_fields[:50]
+        },
+        "scoring_issues": {
+            "count": len(scoring_issues),
+            "details": scoring_issues[:50]
+        },
+        "grading_analysis": grading_analysis
+    }
+
+def find_duplicate_prospects(prospects):
+    """Find prospects with duplicate email addresses"""
+    email_groups = {}
+    
+    for prospect in prospects:
+        email = prospect.get('email', '').lower().strip()
+        if email:
+            if email not in email_groups:
+                email_groups[email] = []
+            email_groups[email].append(prospect)
+    
+    duplicates = []
+    for email, group in email_groups.items():
+        if len(group) > 1:
+            duplicates.append({
+                "email": email,
+                "count": len(group),
+                "prospects": [{
+                    "id": p.get('id'),
+                    "firstName": p.get('firstName', ''),
+                    "lastName": p.get('lastName', ''),
+                    "createdAt": p.get('createdAt', '')
+                } for p in group]
+            })
+    
+    return duplicates
+
+def find_inactive_prospects(prospects):
+    """Find prospects with no activity in 90+ days"""
+    from datetime import datetime, timedelta
+    
+    cutoff_date = datetime.now() - timedelta(days=90)
+    inactive = []
+    
+    for prospect in prospects:
+        last_activity = prospect.get('lastActivityAt')
+        if not last_activity:
+            # No activity recorded
+            inactive.append({
+                "id": prospect.get('id'),
+                "email": prospect.get('email', ''),
+                "firstName": prospect.get('firstName', ''),
+                "lastName": prospect.get('lastName', ''),
+                "lastActivityAt": None,
+                "daysSinceActivity": "Never"
+            })
+        else:
+            try:
+                # Parse the date string
+                activity_date = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                if activity_date < cutoff_date:
+                    days_inactive = (datetime.now() - activity_date.replace(tzinfo=None)).days
+                    inactive.append({
+                        "id": prospect.get('id'),
+                        "email": prospect.get('email', ''),
+                        "firstName": prospect.get('firstName', ''),
+                        "lastName": prospect.get('lastName', ''),
+                        "lastActivityAt": last_activity,
+                        "daysSinceActivity": days_inactive
+                    })
+            except:
+                # If date parsing fails, consider as inactive
+                inactive.append({
+                    "id": prospect.get('id'),
+                    "email": prospect.get('email', ''),
+                    "firstName": prospect.get('firstName', ''),
+                    "lastName": prospect.get('lastName', ''),
+                    "lastActivityAt": last_activity,
+                    "daysSinceActivity": "Unknown"
+                })
+    
+    return inactive
+
+def find_missing_critical_fields(prospects):
+    """Find prospects missing critical fields"""
+    missing = []
+    
+    for prospect in prospects:
+        missing_fields = []
+        
+        if not prospect.get('country'):
+            missing_fields.append('country')
+        if not prospect.get('jobTitle'):
+            missing_fields.append('jobTitle')
+        if not prospect.get('firstName'):
+            missing_fields.append('firstName')
+        if not prospect.get('lastName'):
+            missing_fields.append('lastName')
+        
+        if missing_fields:
+            missing.append({
+                "id": prospect.get('id'),
+                "email": prospect.get('email', ''),
+                "firstName": prospect.get('firstName', ''),
+                "lastName": prospect.get('lastName', ''),
+                "missingFields": missing_fields
+            })
+    
+    return missing
+
+def find_scoring_inconsistencies(prospects):
+    """Find prospects with scoring inconsistencies"""
+    inconsistencies = []
+    
+    for prospect in prospects:
+        score = prospect.get('score', 0)
+        last_activity = prospect.get('lastActivityAt')
+        
+        # High score but no recent activity (potential issue)
+        if score > 50 and not last_activity:
+            inconsistencies.append({
+                "id": prospect.get('id'),
+                "email": prospect.get('email', ''),
+                "firstName": prospect.get('firstName', ''),
+                "lastName": prospect.get('lastName', ''),
+                "score": score,
+                "issue": "High score but no activity recorded",
+                "lastActivityAt": last_activity
+            })
+        elif score > 75:
+            # Check if high score aligns with recent activity
+            try:
+                if last_activity:
+                    from datetime import datetime, timedelta
+                    activity_date = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                    days_since = (datetime.now() - activity_date.replace(tzinfo=None)).days
+                    
+                    if days_since > 30:
+                        inconsistencies.append({
+                            "id": prospect.get('id'),
+                            "email": prospect.get('email', ''),
+                            "firstName": prospect.get('firstName', ''),
+                            "lastName": prospect.get('lastName', ''),
+                            "score": score,
+                            "issue": f"High score but no activity in {days_since} days",
+                            "lastActivityAt": last_activity
+                        })
+            except:
+                pass
+    
+    return inconsistencies
+
+def analyze_grading_setup(prospects):
+    """Analyze grading distribution and setup"""
+    grade_distribution = {}
+    total_graded = 0
+    
+    for prospect in prospects:
+        grade = prospect.get('grade')
+        if grade:
+            total_graded += 1
+            if grade not in grade_distribution:
+                grade_distribution[grade] = 0
+            grade_distribution[grade] += 1
+    
+    # Calculate percentages
+    grade_percentages = {}
+    if total_graded > 0:
+        for grade, count in grade_distribution.items():
+            grade_percentages[grade] = round((count / total_graded) * 100, 2)
+    
+    return {
+        "total_prospects": len(prospects),
+        "graded_prospects": total_graded,
+        "ungraded_prospects": len(prospects) - total_graded,
+        "grading_coverage": round((total_graded / len(prospects)) * 100, 2) if prospects else 0,
+        "grade_distribution": grade_distribution,
+        "grade_percentages": grade_percentages
+    }
+
+# ===== Helper Functions =====
+def fetch_all_mails(access_token, fields="id,name,subject,createdAt", day=None, month=None, year=None):
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        print(f"Fetching mails with headers: {headers}")
+        
+        # Calculate date threshold
+        if day and month and year:
+            try:
+                start_date = datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
+                print(f"Using date filter: {start_date}")
+            except ValueError as e:
+                print(f"Invalid date parameters: {e}")
+                return []
+        else:
+            now = datetime.now(timezone.utc)
+            start_date = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+            print(f"Using default date filter: {start_date}")
+
+        date_threshold = start_date.isoformat().replace("+00:00", "Z")
+        print(f"Date threshold: {date_threshold}")
+        
+        # Fetch emails with pagination
+        all_mails = []
+        url = "https://pi.pardot.com/api/v5/objects/list-emails"
+        params = {"fields": fields, "limit": 200}
+        
+        while url:
+            print(f"Fetching from URL: {url}")
+            response = requests.get(url, headers=headers, params=params if url.endswith("list-emails") else None)
+            
+            print(f"Response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                print(f"API Error: {response.text}")
+                break
+
+            data = response.json()
+            emails = data.get("values", [])
+            print(f"Got {len(emails)} emails from API")
+            
+            for email in emails:
+                email_date = email.get("createdAt", "")
+                if email_date >= date_threshold:  # Use >= instead of >
+                    all_mails.append(email)
+
+            url = data.get("nextPageUrl")
+            print(f"Next URL: {url}")
+
+        print(f"Total emails after filtering: {len(all_mails)}")
+        return all_mails
+        
+    except Exception as e:
+        print(f"Error in fetch_all_mails: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 def fetch_email_stats(access_token, email_id):
     try:
@@ -329,37 +718,59 @@ def fetch_email_stats(access_token, email_id):
         return None
 
 def fetch_single_email_stats(args):
-    access_token, email, business_unit_id = args
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Pardot-Business-Unit-Id": business_unit_id
-    }
+    try:
+        access_token, email, business_unit_id = args
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": business_unit_id
+        }
 
-    response = requests.get(f"https://pi.pardot.com/api/v5/objects/list-emails/{email['id']}/stats", headers=headers)
-    if response.status_code != 200:
+        email_id = email.get('id')
+        if not email_id:
+            print(f"No ID found for email: {email}")
+            return None
+            
+        response = requests.get(f"https://pi.pardot.com/api/v5/objects/list-emails/{email_id}/stats", headers=headers)
+        
+        if response.status_code != 200:
+            print(f"Failed to get stats for email {email_id}: {response.status_code} - {response.text}")
+            return None
+        
+        return {
+            "id": email_id,
+            "name": email.get("name", "Unknown"),
+            "subject": email.get("subject", ""),
+            "createdat": email.get("createdAt", ""),
+            "stats": response.json()
+        }
+        
+    except Exception as e:
+        print(f"Error processing email stats: {str(e)}")
         return None
-    
-    return {
-        "id": email["id"],
-        "name": email["name"],
-        "subject": email.get("subject"),
-        "createdat": email["createdAt"],
-        "stats": response.json()
-    }
 
 def fetch_email_stats_parallel(access_token, emails):
     if not emails:
+        print("No emails to process")
         return []
         
     try:
         credentials = get_credentials()
         business_unit_id = credentials['business_unit_id']
         
+        print(f"Processing {len(emails)} emails with business_unit_id: {business_unit_id}")
+        
         with ThreadPoolExecutor(max_workers=10) as executor:
             args_list = [(access_token, email, business_unit_id) for email in emails]
             results = list(executor.map(fetch_single_email_stats, args_list))
-        return [result for result in results if result is not None]
-    except Exception:
+        
+        valid_results = [result for result in results if result is not None]
+        print(f"Got valid stats for {len(valid_results)} out of {len(emails)} emails")
+        return valid_results
+        
+    except Exception as e:
+        print(f"Error in fetch_email_stats_parallel: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def fetch_all_activities(headers):
@@ -387,6 +798,7 @@ def fetch_all_activities(headers):
             else:
                 break
         else:
+            print(f"Error fetching activities: {response.status_code} - {response.text}")
             break
     
     return all_activities
@@ -414,6 +826,8 @@ def calculate_form_stats(form, activities_by_form):
         "unique_clicks": get_unique_count(clicks),
         "conversions": len([a for a in submissions if a.get("prospect_id")])
     }
+
+
 
 # ===== Professional PDF Report Generator =====
 def create_professional_pdf_report(stats_list, day=None, month=None, year=None):
@@ -471,7 +885,7 @@ def create_modern_header_and_summary(stats_list, day, month, year):
         
         # Create summary cards in a table format
         summary_cards = [
-            ['📧 TOTAL CAMPAIGNS', '📤 EMAILS SENT', '📬 DELIVERED', '👁️ OPENS'],
+            ['📧 TOTAL List Mails', '📤 EMAILS SENT', '📬 DELIVERED', '👁️ OPENS'],
             [f"{len(stats_list):,}", f"{totals['sent']:,}", f"{totals['delivered']:,}", f"{totals['opens']:,}"],
             ['🖱️ CLICKS', '📊 OPEN RATE', '🎯 CLICK RATE', '⚡ ENGAGEMENT'],
             [f"{totals['clicks']:,}", f"{totals['open_rate']:.1f}%", f"{totals['click_rate']:.1f}%", 
@@ -641,15 +1055,12 @@ def create_insights_section(stats_list):
     
     # Create insights table
     insights_data = [
-        ['📊 PERFORMANCE ANALYSIS', 'VALUE', 'RECOMMENDATION'],
-        ['Overall Open Rate', f"{totals['open_rate']:.1f}%", 
-         'Excellent (>25%)' if totals['open_rate'] > 25 else 'Good (15-25%)' if totals['open_rate'] > 15 else 'Needs Improvement (<15%)'],
-        ['Overall Click Rate', f"{totals['click_rate']:.1f}%", 
-         'Excellent (>3%)' if totals['click_rate'] > 3 else 'Good (1-3%)' if totals['click_rate'] > 1 else 'Needs Improvement (<1%)'],
-        ['Best Performing Campaign', f"{best_campaign.get('name', 'Unknown')[:20]}...", f"Open Rate: {best_open_rate:.1f}% - Analyze for best practices"],
-        ['Lowest Performing Campaign', f"{worst_campaign.get('name', 'Unknown')[:20]}...", f"Open Rate: {worst_open_rate:.1f}% - Review subject line & timing"],
-        ['Total Engagement', f"{((totals['opens'] + totals['clicks']) / totals['delivered'] * 100):.1f}%" if totals['delivered'] > 0 else '0%', 
-         'Focus on mobile optimization & personalization']
+        ['📊 PERFORMANCE ANALYSIS', 'VALUE'],
+        ['Overall Open Rate', f"{totals['open_rate']:.1f}%"],
+        ['Overall Click Rate', f"{totals['click_rate']:.1f}%"],
+        ['Best Performing Campaign', f"{best_campaign.get('name', 'Unknown')[:20]}..."],
+        ['Lowest Performing Campaign', f"{worst_campaign.get('name', 'Unknown')[:20]}..."],
+        ['Total Engagement', f"{((totals['opens'] + totals['clicks']) / totals['delivered'] * 100):.1f}%" if totals['delivered'] > 0 else '0%']
     ]
     
     insights_table = Table(insights_data, colWidths=[2.5*inch, 2*inch, 2.7*inch])
@@ -800,6 +1211,158 @@ def create_campaign_performance_chart(stats_list):
     drawing.add(title)
     
     return drawing
+
+def create_form_pdf_report(form_stats):
+    """Generate PDF report for form statistics"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
+    
+    content = []
+    styles = getSampleStyleSheet()
+    
+    # Header
+    header_style = ParagraphStyle('FormHeader', parent=styles['Heading1'], 
+                                fontSize=20, spaceAfter=16, alignment=1, 
+                                textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
+    
+    content.append(Paragraph("📝 FORM PERFORMANCE REPORT", header_style))
+    content.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
+                           ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, spaceAfter=16, alignment=1, textColor=colors.HexColor('#6b7280'))))
+    
+    # Summary
+    total_views = sum(form.get('views', 0) for form in form_stats)
+    total_submissions = sum(form.get('submissions', 0) for form in form_stats)
+    avg_conversion = (total_submissions / total_views * 100) if total_views > 0 else 0
+    
+    summary_data = [
+        ['📊 FORM SUMMARY', 'VALUE'],
+        ['Total Forms', f"{len(form_stats):,}"],
+        ['Total Views', f"{total_views:,}"],
+        ['Total Submissions', f"{total_submissions:,}"],
+        ['Average Conversion Rate', f"{avg_conversion:.1f}%"]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#475569')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1d5db')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')])
+    ]))
+    
+    content.append(summary_table)
+    content.append(Spacer(1, 0.3*inch))
+    
+    # Form details table
+    if form_stats:
+        table_data = [['Form Name', 'Views', 'Submissions', 'Conversion Rate']]
+        
+        for form in form_stats[:20]:  # Limit to first 20 forms
+            name = form.get('name', 'Unknown')[:30] + '...' if len(form.get('name', '')) > 30 else form.get('name', 'Unknown')
+            views = form.get('views', 0)
+            submissions = form.get('submissions', 0)
+            conversion_rate = (submissions / views * 100) if views > 0 else 0
+            
+            table_data.append([
+                name,
+                f"{views:,}",
+                f"{submissions:,}",
+                f"{conversion_rate:.1f}%"
+            ])
+        
+        form_table = Table(table_data, colWidths=[3*inch, 1*inch, 1*inch, 1.2*inch])
+        form_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#334155')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f9')])
+        ]))
+        
+        content.append(Paragraph("📋 FORM PERFORMANCE DETAILS", 
+                               ParagraphStyle('SectionHeader', parent=styles['Heading2'], fontSize=16, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
+        content.append(form_table)
+    
+    doc.build(content)
+    buffer.seek(0)
+    return buffer
+
+def create_prospect_pdf_report(health_data):
+    """Generate PDF report for prospect health analysis"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
+    
+    content = []
+    styles = getSampleStyleSheet()
+    
+    # Header
+    header_style = ParagraphStyle('ProspectHeader', parent=styles['Heading1'], 
+                                fontSize=20, spaceAfter=16, alignment=1, 
+                                textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
+    
+    content.append(Paragraph("🏥 PROSPECT DATABASE HEALTH REPORT", header_style))
+    content.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
+                           ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, spaceAfter=16, alignment=1, textColor=colors.HexColor('#6b7280'))))
+    
+    # Health summary
+    summary_data = [
+        ['📊 DATABASE HEALTH SUMMARY', 'COUNT', 'PERCENTAGE'],
+        ['Total Prospects', f"{health_data['total_prospects']:,}", '100%'],
+        ['Duplicate Prospects', f"{health_data['duplicates']['count']:,}", f"{(health_data['duplicates']['count']/health_data['total_prospects']*100):.1f}%"],
+        ['Inactive Prospects (90+ days)', f"{health_data['inactive_prospects']['count']:,}", f"{(health_data['inactive_prospects']['count']/health_data['total_prospects']*100):.1f}%"],
+        ['Missing Critical Fields', f"{health_data['missing_fields']['count']:,}", f"{(health_data['missing_fields']['count']/health_data['total_prospects']*100):.1f}%"],
+        ['Scoring Issues', f"{health_data['scoring_issues']['count']:,}", f"{(health_data['scoring_issues']['count']/health_data['total_prospects']*100):.1f}%"]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#64748b')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1d5db')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')])
+    ]))
+    
+    content.append(summary_table)
+    content.append(Spacer(1, 0.3*inch))
+    
+    # Grading analysis
+    grading = health_data.get('grading_analysis', {})
+    if grading:
+        content.append(Paragraph("📊 GRADING ANALYSIS", 
+                               ParagraphStyle('SectionHeader', parent=styles['Heading2'], fontSize=16, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
+        
+        grading_data = [
+            ['Grading Metric', 'Value'],
+            ['Grading Coverage', f"{grading.get('grading_coverage', 0):.1f}%"],
+            ['Graded Prospects', f"{grading.get('graded_prospects', 0):,}"],
+            ['Ungraded Prospects', f"{grading.get('ungraded_prospects', 0):,}"]
+        ]
+        
+        grading_table = Table(grading_data, colWidths=[3*inch, 2*inch])
+        grading_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#22c55e')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')])
+        ]))
+        
+        content.append(grading_table)
+    
+    doc.build(content)
+    buffer.seek(0)
+    return buffer
 
 if __name__ == "__main__":
     app.run(port=4000, debug=True)

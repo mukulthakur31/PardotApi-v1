@@ -47,46 +47,98 @@ class GoogleIntegration:
         spreadsheet = service.spreadsheets().create(body=spreadsheet).execute()
         spreadsheet_id = spreadsheet.get('spreadsheetId')
         
-        # Prepare data for sheets
+        # Prepare data for sheets based on data type
         if data:
-            headers = ['Email ID', 'Name', 'Subject', 'Created At', 'Sent', 'Delivered', 'Hard Bounced', 'Soft Bounced', 'Opens', 'Unique Opens', 'Opens Rate', 'Total Clicks', 'Unique Clicks', 'Click Through Rate', 'Unique Click Through Rate', 'Click Open Ratio', 'Opt Outs', 'Opt Out Rate', 'Spam Complaints', 'Spam Complaint Rate', 'Delivery Rate']
-            values = [headers]
+            values = []
             
-            for item in data:
-                stats = item.get('stats', {})
-                row = [
-                    item.get('id', ''),
-                    item.get('name', ''),
-                    item.get('subject', ''),
-                    item.get('createdat', ''),
-                    stats.get('sent', 0),
-                    stats.get('delivered', 0),
-                    stats.get('hardBounced', 0),
-                    stats.get('softBounced', 0),
-                    stats.get('opens', 0),
-                    stats.get('uniqueOpens', 0),
-                    stats.get('opensRate', 0),
-                    stats.get('totalClicks', 0),
-                    stats.get('uniqueClicks', 0),
-                    stats.get('clickThroughRate', 0),
-                    stats.get('uniqueClickThroughRate', 0),
-                    stats.get('clickOpenRatio', 0),
-                    stats.get('optOuts', 0),
-                    stats.get('optOutRate', 0),
-                    stats.get('spamComplaints', 0),
-                    stats.get('spamComplaintRate', 0),
-                    stats.get('deliveryRate', 0)
-                ]
-                values.append(row)
+            # Check if it's email data (has 'stats' key)
+            if isinstance(data, list) and len(data) > 0 and 'stats' in data[0]:
+                # Email data
+                headers = ['Email ID', 'Name', 'Subject', 'Created At', 'Sent', 'Delivered', 'Hard Bounced', 'Soft Bounced', 'Opens', 'Unique Opens', 'Opens Rate', 'Total Clicks', 'Unique Clicks', 'Click Through Rate', 'Unique Click Through Rate', 'Click Open Ratio', 'Opt Outs', 'Opt Out Rate', 'Spam Complaints', 'Spam Complaint Rate', 'Delivery Rate']
+                values = [headers]
+                
+                for item in data:
+                    stats = item.get('stats', {})
+                    row = [
+                        item.get('id', ''),
+                        item.get('name', ''),
+                        item.get('subject', ''),
+                        item.get('createdat', ''),
+                        stats.get('sent', 0),
+                        stats.get('delivered', 0),
+                        stats.get('hardBounced', 0),
+                        stats.get('softBounced', 0),
+                        stats.get('opens', 0),
+                        stats.get('uniqueOpens', 0),
+                        stats.get('opensRate', 0),
+                        stats.get('totalClicks', 0),
+                        stats.get('uniqueClicks', 0),
+                        stats.get('clickThroughRate', 0),
+                        stats.get('uniqueClickThroughRate', 0),
+                        stats.get('clickOpenRatio', 0),
+                        stats.get('optOuts', 0),
+                        stats.get('optOutRate', 0),
+                        stats.get('spamComplaints', 0),
+                        stats.get('spamComplaintRate', 0),
+                        stats.get('deliveryRate', 0)
+                    ]
+                    values.append(row)
+            
+            # Check if it's form data (has 'views' key)
+            elif isinstance(data, list) and len(data) > 0 and 'views' in data[0]:
+                # Form data
+                headers = ['Form ID', 'Form Name', 'Views', 'Unique Views', 'Submissions', 'Unique Submissions', 'Clicks', 'Unique Clicks', 'Conversions', 'Conversion Rate']
+                values = [headers]
+                
+                for item in data:
+                    views = item.get('views', 0)
+                    submissions = item.get('submissions', 0)
+                    conversion_rate = (submissions / views * 100) if views > 0 else 0
+                    
+                    row = [
+                        item.get('id', ''),
+                        item.get('name', ''),
+                        views,
+                        item.get('unique_views', 0),
+                        submissions,
+                        item.get('unique_submissions', 0),
+                        item.get('clicks', 0),
+                        item.get('unique_clicks', 0),
+                        item.get('conversions', 0),
+                        f"{conversion_rate:.2f}%"
+                    ]
+                    values.append(row)
+            
+            # Check if it's prospect health data (has 'total_prospects' key)
+            elif isinstance(data, dict) and 'total_prospects' in data:
+                # Prospect health data
+                headers = ['Metric', 'Count', 'Percentage']
+                values = [headers]
+                
+                total = data['total_prospects']
+                values.append(['Total Prospects', total, '100%'])
+                values.append(['Duplicates', data['duplicates']['count'], f"{(data['duplicates']['count']/total*100):.1f}%"])
+                values.append(['Inactive (90+ days)', data['inactive_prospects']['count'], f"{(data['inactive_prospects']['count']/total*100):.1f}%"])
+                values.append(['Missing Fields', data['missing_fields']['count'], f"{(data['missing_fields']['count']/total*100):.1f}%"])
+                values.append(['Scoring Issues', data['scoring_issues']['count'], f"{(data['scoring_issues']['count']/total*100):.1f}%"])
+                
+                grading = data.get('grading_analysis', {})
+                if grading:
+                    values.append(['', '', ''])  # Empty row
+                    values.append(['Grading Analysis', '', ''])
+                    values.append(['Grading Coverage', f"{grading.get('grading_coverage', 0):.1f}%", ''])
+                    values.append(['Graded Prospects', grading.get('graded_prospects', 0), ''])
+                    values.append(['Ungraded Prospects', grading.get('ungraded_prospects', 0), ''])
             
             # Update spreadsheet with data
-            body = {'values': values}
-            service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range='A1',
-                valueInputOption='RAW',
-                body=body
-            ).execute()
+            if values:
+                body = {'values': values}
+                service.spreadsheets().values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range='A1',
+                    valueInputOption='RAW',
+                    body=body
+                ).execute()
         
         return spreadsheet_id
     

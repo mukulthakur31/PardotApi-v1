@@ -59,6 +59,12 @@ export default function Dashboard() {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("emails");
+  const [prospectHealth, setProspectHealth] = useState(null);
+  const [inactiveProspects, setInactiveProspects] = useState(null);
+  const [duplicateProspects, setDuplicateProspects] = useState(null);
+  const [missingFieldsProspects, setMissingFieldsProspects] = useState(null);
+  const [scoringIssuesProspects, setScoringIssuesProspects] = useState(null);
+  const [activeProspectView, setActiveProspectView] = useState(null);
 
   const [day, setDay] = useState("");
   const [month, setMonth] = useState("");
@@ -129,18 +135,110 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   };
 
-  const downloadPDF = () => {
+  const getProspectHealth = () => {
+    setLoading(true);
     axios
-      .get("http://localhost:4000/download-pdf", {
+      .get("http://localhost:4000/get-prospect-health", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setProspectHealth(res.data);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const getInactiveProspects = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-inactive-prospects", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setInactiveProspects(res.data);
+        setActiveProspectView('inactive');
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const getDuplicateProspects = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-duplicate-prospects", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setDuplicateProspects(res.data);
+        setActiveProspectView('duplicates');
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const getMissingFieldsProspects = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-missing-fields-prospects", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setMissingFieldsProspects(res.data);
+        setActiveProspectView('missing-fields');
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const getScoringIssuesProspects = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-scoring-issues-prospects", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setScoringIssuesProspects(res.data);
+        setActiveProspectView('scoring-issues');
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const downloadPDF = () => {
+    let requestData = {};
+    let filename = "report.pdf";
+    
+    if (activeTab === "emails") {
+      requestData = {
+        data_type: "emails",
+        data: stats,
+        filters: { day, month, year }
+      };
+      filename = "email_campaign_report.pdf";
+    } else if (activeTab === "forms") {
+      requestData = {
+        data_type: "forms",
+        data: formStats
+      };
+      filename = "form_stats_report.pdf";
+    } else if (activeTab === "prospects") {
+      requestData = {
+        data_type: "prospects",
+        data: prospectHealth
+      };
+      filename = "prospect_health_report.pdf";
+    }
+    
+    axios
+      .post("http://localhost:4000/download-pdf", requestData, {
         headers: { Authorization: token },
-        params: { day, month, year },
         responseType: "blob",
       })
       .then((res) => {
         const url = window.URL.createObjectURL(new Blob([res.data]));
         const link = document.createElement("a");
         link.href = url;
-        link.setAttribute("download", "email_campaign_report.pdf");
+        link.setAttribute("download", filename);
         document.body.appendChild(link);
         link.click();
       })
@@ -164,16 +262,36 @@ export default function Dashboard() {
       return;
     }
 
+    if (activeTab === "emails" && stats.length === 0) {
+      alert("Please get email stats first");
+      return;
+    }
+    if (activeTab === "forms" && formStats.length === 0) {
+      alert("Please get form stats first");
+      return;
+    }
+
     setLoading(true);
     try {
+      let exportData = {};
+      
+      if (activeTab === "emails") {
+        exportData = {
+          title: `Email Stats ${year || new Date().getFullYear()}`,
+          data_type: "emails",
+          data: stats
+        };
+      } else if (activeTab === "forms") {
+        exportData = {
+          title: `Form Stats ${new Date().getFullYear()}`,
+          data_type: "forms",
+          data: formStats
+        };
+      }
+
       const response = await axios.post(
         "http://localhost:4000/export-to-sheets",
-        {
-          day,
-          month,
-          year,
-          title: `Email Stats ${year || new Date().getFullYear()}`
-        },
+        exportData,
         {
           headers: { Authorization: token }
         }
@@ -229,16 +347,11 @@ export default function Dashboard() {
         marginBottom: "40px",
         color: "#fff"
       }}>
-        <div style={{
-          fontSize: "4rem",
-          marginBottom: "16px",
-          animation: "float 3s ease-in-out infinite"
-        }}>📊</div>
         <h1 style={{
           fontSize: "3.5rem",
           fontWeight: "800",
           marginBottom: "12px",
-          background: "linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899)",
+          background: "linear-gradient(135deg, #3b82f6, #1e40af)",
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
           animation: "fadeInUp 1s ease-out"
@@ -247,7 +360,7 @@ export default function Dashboard() {
           fontSize: "1.25rem", 
           color: "#cbd5e1",
           animation: "fadeInUp 1.2s ease-out"
-        }}>Pardot Marketing Intelligence</p>
+        }}>Pardot Marketing Intelligence Platform</p>
         
         {/* Toggle Buttons */}
         <div style={{
@@ -263,7 +376,7 @@ export default function Dashboard() {
               borderRadius: "12px",
               border: "none",
               background: activeTab === "emails" 
-                ? "linear-gradient(135deg, #6366f1, #8b5cf6)" 
+                ? "linear-gradient(135deg, #3b82f6, #1e40af)" 
                 : "rgba(51, 65, 85, 0.8)",
               color: "#ffffff",
               cursor: "pointer",
@@ -271,7 +384,7 @@ export default function Dashboard() {
               fontWeight: "600",
               transition: "all 0.3s ease",
               boxShadow: activeTab === "emails" 
-                ? "0 8px 25px rgba(99, 102, 241, 0.3)" 
+                ? "0 8px 25px rgba(59, 130, 246, 0.3)" 
                 : "0 4px 15px rgba(0, 0, 0, 0.1)"
             }}
             onMouseOver={(e) => {
@@ -285,7 +398,7 @@ export default function Dashboard() {
               }
             }}
           >
-            📧 Emails
+            Emails
           </button>
           <button
             onClick={() => setActiveTab("forms")}
@@ -294,7 +407,7 @@ export default function Dashboard() {
               borderRadius: "12px",
               border: "none",
               background: activeTab === "forms" 
-                ? "linear-gradient(135deg, #6366f1, #8b5cf6)" 
+                ? "linear-gradient(135deg, #475569, #334155)" 
                 : "rgba(51, 65, 85, 0.8)",
               color: "#ffffff",
               cursor: "pointer",
@@ -302,7 +415,7 @@ export default function Dashboard() {
               fontWeight: "600",
               transition: "all 0.3s ease",
               boxShadow: activeTab === "forms" 
-                ? "0 8px 25px rgba(99, 102, 241, 0.3)" 
+                ? "0 8px 25px rgba(71, 85, 105, 0.3)" 
                 : "0 4px 15px rgba(0, 0, 0, 0.1)"
             }}
             onMouseOver={(e) => {
@@ -316,7 +429,38 @@ export default function Dashboard() {
               }
             }}
           >
-            📝 Forms
+            Forms
+          </button>
+          <button
+            onClick={() => setActiveTab("prospects")}
+            style={{
+              padding: "12px 24px",
+              borderRadius: "12px",
+              border: "none",
+              background: activeTab === "prospects" 
+                ? "linear-gradient(135deg, #64748b, #475569)" 
+                : "rgba(51, 65, 85, 0.8)",
+              color: "#ffffff",
+              cursor: "pointer",
+              fontSize: "1rem",
+              fontWeight: "600",
+              transition: "all 0.3s ease",
+              boxShadow: activeTab === "prospects" 
+                ? "0 8px 25px rgba(100, 116, 139, 0.3)" 
+                : "0 4px 15px rgba(0, 0, 0, 0.1)"
+            }}
+            onMouseOver={(e) => {
+              if (activeTab !== "prospects") {
+                e.target.style.background = "rgba(71, 85, 105, 0.9)";
+              }
+            }}
+            onMouseOut={(e) => {
+              if (activeTab !== "prospects") {
+                e.target.style.background = "rgba(51, 65, 85, 0.8)";
+              }
+            }}
+          >
+            Prospects
           </button>
         </div>
       </div>
@@ -342,16 +486,19 @@ export default function Dashboard() {
           animation: "slideInLeft 0.8s ease-out"
         }}>
           <div style={{ 
-            fontSize: "2.5rem", 
+            width: "12px",
+            height: "12px",
+            borderRadius: "50%",
+            backgroundColor: token ? "#22c55e" : "#ef4444",
             marginBottom: "16px"
-          }}>🔐</div>
+          }}></div>
           <div style={{ fontWeight: "700", marginBottom: "8px", fontSize: "1.1rem" }}>Pardot Status</div>
           <div style={{ 
             color: token ? "#22c55e" : "#ef4444",
             fontWeight: "600",
             fontSize: "1rem"
           }}>
-            {token ? "✅ Connected" : "❌ Disconnected"}
+            {token ? "Connected" : "Disconnected"}
           </div>
         </div>
         
@@ -368,16 +515,19 @@ export default function Dashboard() {
           animation: "slideInRight 0.8s ease-out"
         }}>
           <div style={{ 
-            fontSize: "2.5rem", 
+            width: "12px",
+            height: "12px",
+            borderRadius: "50%",
+            backgroundColor: googleAuth ? "#22c55e" : "#ef4444",
             marginBottom: "16px"
-          }}>📊</div>
+          }}></div>
           <div style={{ fontWeight: "700", marginBottom: "8px", fontSize: "1.1rem" }}>Google Workspace</div>
           <div style={{ 
             color: googleAuth ? "#22c55e" : "#ef4444",
             fontWeight: "600",
             fontSize: "1rem"
           }}>
-            {googleAuth ? "✅ Connected" : "❌ Disconnected"}
+            {googleAuth ? "Connected" : "Disconnected"}
           </div>
         </div>
       </div>
@@ -411,7 +561,7 @@ export default function Dashboard() {
               fontSize: "1.4rem",
               fontWeight: "700",
               color: "#f1f5f9"
-            }}>📅 Filter by Date</h3>
+            }}>Date Filters</h3>
             
             <div style={{
               display: "flex",
@@ -459,22 +609,29 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Tiles */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
           gap: "24px",
-          marginBottom: "40px"
+          marginBottom: "48px",
+          maxWidth: "1400px",
+          margin: "0 auto 48px auto"
         }}>
           {/* Data Actions */}
           <div style={{
-            background: "rgba(30, 41, 59, 0.6)",
-            borderRadius: "16px",
-            padding: "32px",
-            border: "1px solid rgba(255, 255, 255, 0.05)",
-            textAlign: "center"
+            background: "rgba(30, 41, 59, 0.7)",
+            borderRadius: "20px",
+            padding: "40px",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            textAlign: "center",
+            minHeight: "280px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)"
           }}>
-            <h4 style={{ marginBottom: "24px", fontSize: "1.3rem", fontWeight: "700", color: "#f1f5f9" }}>📊 Data Actions</h4>
+            <h4 style={{ marginBottom: "24px", fontSize: "1.3rem", fontWeight: "700", color: "#f1f5f9" }}>Data Actions</h4>
             {activeTab === "emails" ? (
               <>
                 <button
@@ -482,35 +639,77 @@ export default function Dashboard() {
                   disabled={!token || loading}
                   style={{
                     ...modernButtonStyle,
-                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    background: "linear-gradient(135deg, #3b82f6, #1e40af)",
                     marginBottom: "16px",
                     width: "100%"
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #7c3aed, #a855f7)";
+                    e.target.style.background = "linear-gradient(135deg, #2563eb, #1d4ed8)";
                     e.target.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #6366f1, #8b5cf6)";
+                    e.target.style.background = "linear-gradient(135deg, #3b82f6, #1e40af)";
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
-                  📈 Get Email Stats
+                  Get Email Stats
                 </button>
                 <button
                   onClick={downloadPDF}
                   disabled={!token || loading}
                   style={{
                     ...modernButtonStyle,
-                    background: "linear-gradient(135deg, #ec4899, #f43f5e)",
+                    background: "linear-gradient(135deg, #64748b, #475569)",
                     width: "100%"
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #db2777, #e11d48)";
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
                     e.target.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #ec4899, #f43f5e)";
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
+                    e.target.style.transform = "translateY(0)";
+                  }}
+                >
+                  📝 Download PDF
+                </button>
+              </>
+            ) : activeTab === "forms" ? (
+              <>
+                <button
+                  onClick={getFormStats}
+                  disabled={!token || loading}
+                  style={{
+                    ...modernButtonStyle,
+                    background: "linear-gradient(135deg, #475569, #334155)",
+                    marginBottom: "16px",
+                    width: "100%"
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #334155, #1e293b)";
+                    e.target.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.transform = "translateY(0)";
+                  }}
+                >
+                  Get Form Stats
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  disabled={!token || loading || formStats.length === 0}
+                  style={{
+                    ...modernButtonStyle,
+                    background: "linear-gradient(135deg, #64748b, #475569)",
+                    width: "100%"
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
@@ -518,38 +717,76 @@ export default function Dashboard() {
                 </button>
               </>
             ) : (
-              <button
-                onClick={getFormStats}
-                disabled={!token || loading}
-                style={{
-                  ...modernButtonStyle,
-                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                  width: "100%"
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.background = "linear-gradient(135deg, #16a34a, #15803d)";
-                  e.target.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = "linear-gradient(135deg, #22c55e, #16a34a)";
-                  e.target.style.transform = "translateY(0)";
-                }}
-              >
-                📋 Get Form Stats
-              </button>
+              <>
+                <button
+                  onClick={getProspectHealth}
+                  disabled={!token || loading}
+                  style={{
+                    ...modernButtonStyle,
+                    background: "linear-gradient(135deg, #64748b, #475569)",
+                    marginBottom: "16px",
+                    width: "100%"
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
+                    e.target.style.transform = "translateY(0)";
+                  }}
+                >
+                  Analyze Database
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  disabled={!token || loading || !prospectHealth}
+                  style={{
+                    ...modernButtonStyle,
+                    background: "linear-gradient(135deg, #64748b, #475569)",
+                    width: "100%"
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
+                    e.target.style.transform = "translateY(0)";
+                  }}
+                >
+                  📝 Download PDF
+                </button>
+              </>
             )}
           </div>
 
           {/* Google Integration */}
           <div style={{
-            background: "rgba(30, 41, 59, 0.6)",
-            borderRadius: "16px",
-            padding: "32px",
-            border: "1px solid rgba(255, 255, 255, 0.05)",
-            textAlign: "center"
+            background: "rgba(30, 41, 59, 0.7)",
+            borderRadius: "20px",
+            padding: "40px",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            textAlign: "center",
+            minHeight: "280px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)"
           }}>
-            <h4 style={{ marginBottom: "24px", fontSize: "1.3rem", fontWeight: "700", color: "#f1f5f9" }}>📊 Google Workspace</h4>
-            {!googleAuth ? (
+            <h4 style={{ marginBottom: "24px", fontSize: "1.3rem", fontWeight: "700", color: "#f1f5f9" }}>Google Workspace</h4>
+            {activeTab === "prospects" ? (
+              <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                color: "#94a3b8", 
+                fontSize: "1rem",
+                fontStyle: "italic"
+              }}>
+                Use PDF download for prospects data
+              </div>
+            ) : !googleAuth ? (
               <button
                 onClick={authenticateGoogle}
                 disabled={loading}
@@ -567,13 +804,16 @@ export default function Dashboard() {
                   e.target.style.transform = "translateY(0)";
                 }}
               >
-                🔗 Connect Google
+                Connect Google
               </button>
             ) : (
               <>
                 <button
                   onClick={exportToSheets}
-                  disabled={!token || loading}
+                  disabled={!token || loading || 
+                    (activeTab === "emails" && stats.length === 0) ||
+                    (activeTab === "forms" && formStats.length === 0)
+                  }
                   style={{
                     ...modernButtonStyle,
                     background: "linear-gradient(135deg, #059669, #047857)",
@@ -589,7 +829,7 @@ export default function Dashboard() {
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
-                  📊 Export to Sheets
+                  Export to Sheets
                 </button>
                 <button
                   onClick={exportToDrive}
@@ -608,11 +848,13 @@ export default function Dashboard() {
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
-                  💾 Export to Drive
+                  Export to Drive
                 </button>
               </>
             )}
           </div>
+
+
         </div>
         
         {loading && (
@@ -628,7 +870,7 @@ export default function Dashboard() {
               fontSize: "3rem", 
               marginBottom: "16px",
               animation: "spin 1s linear infinite"
-            }}>⏳</div>
+            }}></div>
             <p style={{ 
               color: "#cbd5e1", 
               fontWeight: "600", 
@@ -664,7 +906,7 @@ export default function Dashboard() {
                 gap: "12px",
                 color: "#f1f5f9"
               }}>
-                📊 Email Statistics
+                Email Statistics
                 <span style={{
                   background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
                   color: "#ffffff",
@@ -724,9 +966,9 @@ export default function Dashboard() {
                 gap: "12px",
                 color: "#f1f5f9"
               }}>
-                📝 Form Statistics
+                Form Statistics
                 <span style={{
-                  background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                  background: "linear-gradient(135deg, #475569, #334155)",
                   color: "#ffffff",
                   padding: "6px 12px",
                   borderRadius: "8px",
@@ -757,6 +999,574 @@ export default function Dashboard() {
                 {JSON.stringify(formStats, null, 2)}
               </pre>
             </div>
+          </div>
+        )}
+        
+        {activeTab === "prospects" && prospectHealth && (
+          <div style={{
+            background: "rgba(30, 41, 59, 0.6)",
+            borderRadius: "16px",
+            padding: "32px",
+            border: "1px solid rgba(255, 255, 255, 0.05)"
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "24px",
+              flexWrap: "wrap",
+              gap: "16px"
+            }}>
+              <h2 style={{
+                fontSize: "1.75rem",
+                fontWeight: "700",
+                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                color: "#f1f5f9"
+              }}>
+                Prospect Health Analysis
+                <span style={{
+                  background: "linear-gradient(135deg, #64748b, #475569)",
+                  color: "#ffffff",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  fontSize: "0.875rem",
+                  fontWeight: "600"
+                }}>
+                  {prospectHealth.total_prospects} prospects
+                </span>
+              </h2>
+            </div>
+            
+            {/* Health Summary Cards */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "20px",
+              marginBottom: "32px"
+            }}>
+              <div style={{
+                background: "linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                borderRadius: "16px",
+                padding: "24px",
+                cursor: "pointer",
+                transition: "all 0.3s ease"
+              }}
+              onClick={getDuplicateProspects}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 40px rgba(239, 68, 68, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.4)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.2)";
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ color: "#ef4444", fontSize: "1.1rem", fontWeight: "600" }}>Duplicate Prospects</div>
+                  <div style={{ 
+                    backgroundColor: "#ef4444",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.9rem",
+                    fontWeight: "600"
+                  }}>{prospectHealth.duplicates.count}</div>
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: "0.9rem", marginBottom: "12px" }}>Prospects with identical email addresses</div>
+                <div style={{ 
+                  color: "#ef4444", 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <span>View Details</span>
+                  <span style={{ fontSize: "0.7rem" }}>→</span>
+                </div>
+              </div>
+              
+              <div style={{
+                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05))",
+                border: "1px solid rgba(245, 158, 11, 0.2)",
+                borderRadius: "16px",
+                padding: "24px",
+                cursor: "pointer",
+                transition: "all 0.3s ease"
+              }}
+              onClick={getInactiveProspects}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 40px rgba(245, 158, 11, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(245, 158, 11, 0.4)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "rgba(245, 158, 11, 0.2)";
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ color: "#f59e0b", fontSize: "1.1rem", fontWeight: "600" }}>Inactive Prospects</div>
+                  <div style={{ 
+                    backgroundColor: "#f59e0b",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.9rem",
+                    fontWeight: "600"
+                  }}>{prospectHealth.inactive_prospects.count}</div>
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: "0.9rem", marginBottom: "12px" }}>No activity in 90+ days</div>
+                <div style={{ 
+                  color: "#f59e0b", 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <span>View Details</span>
+                  <span style={{ fontSize: "0.7rem" }}>→</span>
+                </div>
+              </div>
+              
+              <div style={{
+                background: "linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.05))",
+                border: "1px solid rgba(139, 92, 246, 0.2)",
+                borderRadius: "16px",
+                padding: "24px",
+                cursor: "pointer",
+                transition: "all 0.3s ease"
+              }}
+              onClick={getMissingFieldsProspects}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 40px rgba(139, 92, 246, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.4)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "rgba(139, 92, 246, 0.2)";
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ color: "#8b5cf6", fontSize: "1.1rem", fontWeight: "600" }}>Missing Fields</div>
+                  <div style={{ 
+                    backgroundColor: "#8b5cf6",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.9rem",
+                    fontWeight: "600"
+                  }}>{prospectHealth.missing_fields.count}</div>
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: "0.9rem", marginBottom: "12px" }}>Incomplete prospect profiles</div>
+                <div style={{ 
+                  color: "#8b5cf6", 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <span>View Details</span>
+                  <span style={{ fontSize: "0.7rem" }}>→</span>
+                </div>
+              </div>
+              
+              <div style={{
+                background: "linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(8, 145, 178, 0.05))",
+                border: "1px solid rgba(6, 182, 212, 0.2)",
+                borderRadius: "16px",
+                padding: "24px",
+                cursor: "pointer",
+                transition: "all 0.3s ease"
+              }}
+              onClick={getScoringIssuesProspects}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 40px rgba(6, 182, 212, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.4)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.2)";
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ color: "#06b6d4", fontSize: "1.1rem", fontWeight: "600" }}>Scoring Issues</div>
+                  <div style={{ 
+                    backgroundColor: "#06b6d4",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.9rem",
+                    fontWeight: "600"
+                  }}>{prospectHealth.scoring_issues.count}</div>
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: "0.9rem", marginBottom: "12px" }}>Inconsistent scoring patterns</div>
+                <div style={{ 
+                  color: "#06b6d4", 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <span>View Details</span>
+                  <span style={{ fontSize: "0.7rem" }}>→</span>
+                </div>
+              </div>
+              
+              <div style={{
+                background: "linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.05))",
+                border: "1px solid rgba(34, 197, 94, 0.2)",
+                borderRadius: "16px",
+                padding: "24px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div style={{ color: "#22c55e", fontSize: "1.1rem", fontWeight: "600" }}>Grading Coverage</div>
+                  <div style={{ 
+                    backgroundColor: "#22c55e",
+                    color: "white",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "0.9rem",
+                    fontWeight: "600"
+                  }}>{prospectHealth.grading_analysis.grading_coverage}%</div>
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Prospects with assigned grades</div>
+              </div>
+            </div>
+            
+            {/* Detailed Views */}
+            {activeProspectView === 'inactive' && inactiveProspects && (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.8)",
+                borderRadius: "12px",
+                padding: "24px",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                marginBottom: "16px"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px"
+                }}>
+                  <h3 style={{ color: "#f59e0b", margin: 0, fontSize: "1.2rem" }}>Inactive Prospects ({inactiveProspects.total_inactive})</h3>
+                  <button
+                    onClick={() => setActiveProspectView(null)}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      border: "1px solid #ef4444",
+                      color: "#ef4444",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  display: "grid",
+                  gap: "12px"
+                }}>
+                  {inactiveProspects.inactive_prospects.map((prospect, index) => (
+                    <div key={index} style={{
+                      background: "rgba(30, 41, 59, 0.6)",
+                      padding: "16px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(245, 158, 11, 0.3)"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "600", color: "#f1f5f9" }}>
+                            {prospect.firstName} {prospect.lastName}
+                          </div>
+                          <div style={{ color: "#cbd5e1", fontSize: "0.9rem" }}>
+                            📧 {prospect.email}
+                          </div>
+                          <div style={{ color: "#f59e0b", fontSize: "0.8rem", marginTop: "4px" }}>
+                            ID: {prospect.id}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ color: "#ef4444", fontWeight: "600" }}>
+                            {prospect.daysSinceActivity === "Never" ? "No Activity" : `${prospect.daysSinceActivity} days ago`}
+                          </div>
+                          <div style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+                            {prospect.lastActivityAt ? new Date(prospect.lastActivityAt).toLocaleDateString() : "Never"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeProspectView === 'duplicates' && duplicateProspects && (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.8)",
+                borderRadius: "12px",
+                padding: "24px",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                marginBottom: "16px"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px"
+                }}>
+                  <h3 style={{ color: "#ef4444", margin: 0, fontSize: "1.2rem" }}>Duplicate Prospects ({duplicateProspects.total_duplicate_groups} groups)</h3>
+                  <button
+                    onClick={() => setActiveProspectView(null)}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      border: "1px solid #ef4444",
+                      color: "#ef4444",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  display: "grid",
+                  gap: "16px"
+                }}>
+                  {duplicateProspects.duplicate_prospects.map((group, index) => (
+                    <div key={index} style={{
+                      background: "rgba(30, 41, 59, 0.6)",
+                      padding: "16px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(239, 68, 68, 0.3)"
+                    }}>
+                      <div style={{ marginBottom: "12px" }}>
+                        <div style={{ fontWeight: "600", color: "#ef4444" }}>{group.email}</div>
+                        <div style={{ color: "#cbd5e1", fontSize: "0.9rem" }}>{group.count} duplicates found</div>
+                      </div>
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {group.prospects.map((prospect, pIndex) => (
+                          <div key={pIndex} style={{
+                            background: "rgba(15, 23, 42, 0.8)",
+                            padding: "12px",
+                            borderRadius: "6px",
+                            display: "flex",
+                            justifyContent: "space-between"
+                          }}>
+                            <div>
+                              <div style={{ color: "#f1f5f9", fontWeight: "500" }}>
+                                {prospect.firstName} {prospect.lastName}
+                              </div>
+                              <div style={{ color: "#94a3b8", fontSize: "0.8rem" }}>ID: {prospect.id}</div>
+                            </div>
+                            <div style={{ color: "#cbd5e1", fontSize: "0.8rem" }}>
+                              Created: {prospect.createdAt ? new Date(prospect.createdAt).toLocaleDateString() : "Unknown"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeProspectView === 'missing-fields' && missingFieldsProspects && (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.8)",
+                borderRadius: "12px",
+                padding: "24px",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                marginBottom: "16px"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px"
+                }}>
+                  <h3 style={{ color: "#8b5cf6", margin: 0, fontSize: "1.2rem" }}>Missing Fields ({missingFieldsProspects.total_with_missing_fields})</h3>
+                  <button
+                    onClick={() => setActiveProspectView(null)}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      border: "1px solid #ef4444",
+                      color: "#ef4444",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  display: "grid",
+                  gap: "12px"
+                }}>
+                  {missingFieldsProspects.prospects_missing_fields.map((prospect, index) => (
+                    <div key={index} style={{
+                      background: "rgba(30, 41, 59, 0.6)",
+                      padding: "16px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(139, 92, 246, 0.3)"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "600", color: "#f1f5f9" }}>
+                            {prospect.firstName || "[No First Name]"} {prospect.lastName || "[No Last Name]"}
+                          </div>
+                          <div style={{ color: "#cbd5e1", fontSize: "0.9rem" }}>
+                            📧 {prospect.email}
+                          </div>
+                          <div style={{ color: "#8b5cf6", fontSize: "0.8rem", marginTop: "4px" }}>
+                            ID: {prospect.id}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ color: "#ef4444", fontWeight: "600", marginBottom: "4px" }}>
+                            Missing Fields:
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
+                            {prospect.missingFields.map((field, fIndex) => (
+                              <span key={fIndex} style={{
+                                background: "rgba(239, 68, 68, 0.2)",
+                                color: "#ef4444",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontSize: "0.7rem",
+                                border: "1px solid rgba(239, 68, 68, 0.3)"
+                              }}>
+                                {field}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeProspectView === 'scoring-issues' && scoringIssuesProspects && (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.8)",
+                borderRadius: "12px",
+                padding: "24px",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                marginBottom: "16px"
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px"
+                }}>
+                  <h3 style={{ color: "#06b6d4", margin: 0, fontSize: "1.2rem" }}>Scoring Issues ({scoringIssuesProspects.total_scoring_issues})</h3>
+                  <button
+                    onClick={() => setActiveProspectView(null)}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      border: "1px solid #ef4444",
+                      color: "#ef4444",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  display: "grid",
+                  gap: "12px"
+                }}>
+                  {scoringIssuesProspects.prospects_with_scoring_issues.map((prospect, index) => (
+                    <div key={index} style={{
+                      background: "rgba(30, 41, 59, 0.6)",
+                      padding: "16px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(6, 182, 212, 0.3)"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "600", color: "#f1f5f9" }}>
+                            {prospect.firstName} {prospect.lastName}
+                          </div>
+                          <div style={{ color: "#cbd5e1", fontSize: "0.9rem" }}>
+                            📧 {prospect.email}
+                          </div>
+                          <div style={{ color: "#06b6d4", fontSize: "0.8rem", marginTop: "4px" }}>
+                            ID: {prospect.id}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ color: "#f59e0b", fontWeight: "600" }}>
+                            Score: {prospect.score}
+                          </div>
+                          <div style={{ color: "#ef4444", fontSize: "0.9rem", marginTop: "4px" }}>
+                            {prospect.issue}
+                          </div>
+                          <div style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+                            {prospect.lastActivityAt ? new Date(prospect.lastActivityAt).toLocaleDateString() : "No activity"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!activeProspectView && (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.8)",
+                borderRadius: "12px",
+                padding: "24px",
+                overflowX: "auto",
+                maxHeight: "500px",
+                overflowY: "auto",
+                border: "1px solid rgba(255, 255, 255, 0.05)"
+              }}>
+                <div style={{ textAlign: "center", color: "#cbd5e1", padding: "20px" }}>
+                  <div style={{ 
+                    width: "60px",
+                    height: "60px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(59, 130, 246, 0.2)",
+                    border: "2px solid #3b82f6",
+                    margin: "0 auto 16px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.5rem",
+                    color: "#3b82f6"
+                  }}>↑</div>
+                  <p>Click on any health metric above to view detailed information about those prospects.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

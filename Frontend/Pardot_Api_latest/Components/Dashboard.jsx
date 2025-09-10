@@ -245,6 +245,28 @@ export default function Dashboard() {
       .catch((err) => console.error(err));
   };
 
+  const downloadComprehensivePDF = () => {
+    setLoading(true);
+    axios
+      .post("http://localhost:4000/download-summary-pdf", {}, {
+        headers: { Authorization: token },
+        responseType: "blob",
+      })
+      .then((res) => {
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "pardot_comprehensive_report.pdf");
+        document.body.appendChild(link);
+        link.click();
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Error generating comprehensive report. Please try again.");
+      })
+      .finally(() => setLoading(false));
+  };
+
   const authenticateGoogle = async () => {
     try {
       const response = await axios.get("http://localhost:4000/google-auth", {
@@ -362,173 +384,223 @@ export default function Dashboard() {
           animation: "fadeInUp 1.2s ease-out"
         }}>Pardot Marketing Intelligence Platform</p>
         
-        {/* Toggle Buttons */}
+        {/* Navigation Bar */}
         <div style={{
+          background: "rgba(15, 23, 42, 0.9)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          borderRadius: "20px",
+          padding: "16px 24px",
+          marginTop: "32px",
           display: "flex",
-          justifyContent: "center",
-          gap: "16px",
-          marginTop: "32px"
+          justifyContent: "space-between",
+          alignItems: "center",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+          animation: "slideUp 0.8s ease-out"
         }}>
+          {/* Navigation Links */}
+          <nav style={{
+            display: "flex",
+            gap: "8px",
+            flex: 1
+          }}>
+            <button
+              onClick={() => setActiveTab("emails")}
+              style={{
+                padding: "12px 24px",
+                borderRadius: "12px",
+                border: "none",
+                background: activeTab === "emails" 
+                  ? "linear-gradient(135deg, #3b82f6, #2563eb)" 
+                  : "transparent",
+                color: activeTab === "emails" ? "#ffffff" : "#cbd5e1",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: "600",
+                transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                position: "relative"
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== "emails") {
+                  e.target.style.background = "rgba(59, 130, 246, 0.1)";
+                  e.target.style.color = "#3b82f6";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== "emails") {
+                  e.target.style.background = "transparent";
+                  e.target.style.color = "#cbd5e1";
+                }
+              }}
+            >
+              📧 Emails
+            </button>
+            <button
+              onClick={() => setActiveTab("forms")}
+              style={{
+                padding: "12px 24px",
+                borderRadius: "12px",
+                border: "none",
+                background: activeTab === "forms" 
+                  ? "linear-gradient(135deg, #10b981, #059669)" 
+                  : "transparent",
+                color: activeTab === "forms" ? "#ffffff" : "#cbd5e1",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: "600",
+                transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== "forms") {
+                  e.target.style.background = "rgba(16, 185, 129, 0.1)";
+                  e.target.style.color = "#10b981";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== "forms") {
+                  e.target.style.background = "transparent";
+                  e.target.style.color = "#cbd5e1";
+                }
+              }}
+            >
+              📝 Forms
+            </button>
+            <button
+              onClick={() => setActiveTab("prospects")}
+              style={{
+                padding: "12px 24px",
+                borderRadius: "12px",
+                border: "none",
+                background: activeTab === "prospects" 
+                  ? "linear-gradient(135deg, #f59e0b, #d97706)" 
+                  : "transparent",
+                color: activeTab === "prospects" ? "#ffffff" : "#cbd5e1",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: "600",
+                transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== "prospects") {
+                  e.target.style.background = "rgba(245, 158, 11, 0.1)";
+                  e.target.style.color = "#f59e0b";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== "prospects") {
+                  e.target.style.background = "transparent";
+                  e.target.style.color = "#cbd5e1";
+                }
+              }}
+            >
+              🏥 Prospects
+            </button>
+          </nav>
+          
+          {/* Comprehensive PDF Button */}
           <button
-            onClick={() => setActiveTab("emails")}
+            onClick={downloadComprehensivePDF}
+            disabled={!token || loading}
             style={{
-              padding: "12px 24px",
+              padding: "12px 20px",
               borderRadius: "12px",
               border: "none",
-              background: activeTab === "emails" 
-                ? "linear-gradient(135deg, #3b82f6, #1e40af)" 
-                : "rgba(51, 65, 85, 0.8)",
+              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
               color: "#ffffff",
               cursor: "pointer",
-              fontSize: "1rem",
+              fontSize: "0.95rem",
               fontWeight: "600",
               transition: "all 0.3s ease",
-              boxShadow: activeTab === "emails" 
-                ? "0 8px 25px rgba(59, 130, 246, 0.3)" 
-                : "0 4px 15px rgba(0, 0, 0, 0.1)"
+              boxShadow: "0 4px 15px rgba(99, 102, 241, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
             }}
             onMouseOver={(e) => {
-              if (activeTab !== "emails") {
-                e.target.style.background = "rgba(71, 85, 105, 0.9)";
-              }
+              e.target.style.background = "linear-gradient(135deg, #4f46e5, #4338ca)";
+              e.target.style.transform = "translateY(-1px)";
+              e.target.style.boxShadow = "0 6px 20px rgba(99, 102, 241, 0.4)";
             }}
             onMouseOut={(e) => {
-              if (activeTab !== "emails") {
-                e.target.style.background = "rgba(51, 65, 85, 0.8)";
-              }
+              e.target.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
+              e.target.style.transform = "translateY(0)";
+              e.target.style.boxShadow = "0 4px 15px rgba(99, 102, 241, 0.3)";
             }}
           >
-            Emails
-          </button>
-          <button
-            onClick={() => setActiveTab("forms")}
-            style={{
-              padding: "12px 24px",
-              borderRadius: "12px",
-              border: "none",
-              background: activeTab === "forms" 
-                ? "linear-gradient(135deg, #475569, #334155)" 
-                : "rgba(51, 65, 85, 0.8)",
-              color: "#ffffff",
-              cursor: "pointer",
-              fontSize: "1rem",
-              fontWeight: "600",
-              transition: "all 0.3s ease",
-              boxShadow: activeTab === "forms" 
-                ? "0 8px 25px rgba(71, 85, 105, 0.3)" 
-                : "0 4px 15px rgba(0, 0, 0, 0.1)"
-            }}
-            onMouseOver={(e) => {
-              if (activeTab !== "forms") {
-                e.target.style.background = "rgba(71, 85, 105, 0.9)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (activeTab !== "forms") {
-                e.target.style.background = "rgba(51, 65, 85, 0.8)";
-              }
-            }}
-          >
-            Forms
-          </button>
-          <button
-            onClick={() => setActiveTab("prospects")}
-            style={{
-              padding: "12px 24px",
-              borderRadius: "12px",
-              border: "none",
-              background: activeTab === "prospects" 
-                ? "linear-gradient(135deg, #64748b, #475569)" 
-                : "rgba(51, 65, 85, 0.8)",
-              color: "#ffffff",
-              cursor: "pointer",
-              fontSize: "1rem",
-              fontWeight: "600",
-              transition: "all 0.3s ease",
-              boxShadow: activeTab === "prospects" 
-                ? "0 8px 25px rgba(100, 116, 139, 0.3)" 
-                : "0 4px 15px rgba(0, 0, 0, 0.1)"
-            }}
-            onMouseOver={(e) => {
-              if (activeTab !== "prospects") {
-                e.target.style.background = "rgba(71, 85, 105, 0.9)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (activeTab !== "prospects") {
-                e.target.style.background = "rgba(51, 65, 85, 0.8)";
-              }
-            }}
-          >
-            Prospects
+            📈 Full Report
           </button>
         </div>
       </div>
 
-      {/* Status Cards */}
+      {/* Status Bar */}
       <div style={{
+        background: "rgba(15, 23, 42, 0.8)",
+        backdropFilter: "blur(20px)",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        borderRadius: "16px",
+        padding: "16px 32px",
+        marginBottom: "32px",
         display: "flex",
-        gap: "24px",
         justifyContent: "center",
-        marginBottom: "48px",
+        alignItems: "center",
+        gap: "48px",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+        animation: "fadeIn 1s ease-out",
         flexWrap: "wrap"
       }}>
         <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "16px",
-          padding: "24px 32px",
-          color: "#fff",
-          minWidth: "220px",
-          textAlign: "center",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-          animation: "slideInLeft 0.8s ease-out"
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          color: "#fff"
         }}>
           <div style={{ 
-            width: "12px",
-            height: "12px",
+            width: "10px",
+            height: "10px",
             borderRadius: "50%",
             backgroundColor: token ? "#22c55e" : "#ef4444",
-            marginBottom: "16px"
+            boxShadow: token ? "0 0 10px rgba(34, 197, 94, 0.5)" : "0 0 10px rgba(239, 68, 68, 0.5)"
           }}></div>
-          <div style={{ fontWeight: "700", marginBottom: "8px", fontSize: "1.1rem" }}>Pardot Status</div>
-          <div style={{ 
+          <span style={{ fontWeight: "600", fontSize: "0.95rem" }}>Pardot</span>
+          <span style={{ 
             color: token ? "#22c55e" : "#ef4444",
-            fontWeight: "600",
-            fontSize: "1rem"
+            fontWeight: "500",
+            fontSize: "0.9rem"
           }}>
             {token ? "Connected" : "Disconnected"}
-          </div>
+          </span>
         </div>
         
         <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "16px",
-          padding: "24px 32px",
-          color: "#fff",
-          minWidth: "220px",
-          textAlign: "center",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-          animation: "slideInRight 0.8s ease-out"
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          color: "#fff"
         }}>
           <div style={{ 
-            width: "12px",
-            height: "12px",
+            width: "10px",
+            height: "10px",
             borderRadius: "50%",
             backgroundColor: googleAuth ? "#22c55e" : "#ef4444",
-            marginBottom: "16px"
+            boxShadow: googleAuth ? "0 0 10px rgba(34, 197, 94, 0.5)" : "0 0 10px rgba(239, 68, 68, 0.5)"
           }}></div>
-          <div style={{ fontWeight: "700", marginBottom: "8px", fontSize: "1.1rem" }}>Google Workspace</div>
-          <div style={{ 
+          <span style={{ fontWeight: "600", fontSize: "0.95rem" }}>Google Workspace</span>
+          <span style={{ 
             color: googleAuth ? "#22c55e" : "#ef4444",
-            fontWeight: "600",
-            fontSize: "1rem"
+            fontWeight: "500",
+            fontSize: "0.9rem"
           }}>
             {googleAuth ? "Connected" : "Disconnected"}
-          </div>
+          </span>
         </div>
       </div>
 
@@ -639,16 +711,16 @@ export default function Dashboard() {
                   disabled={!token || loading}
                   style={{
                     ...modernButtonStyle,
-                    background: "linear-gradient(135deg, #3b82f6, #1e40af)",
+                    background: "linear-gradient(135deg, #64748b, #475569)",
                     marginBottom: "16px",
                     width: "100%"
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #2563eb, #1d4ed8)";
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
                     e.target.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #3b82f6, #1e40af)";
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
@@ -659,15 +731,15 @@ export default function Dashboard() {
                   disabled={!token || loading}
                   style={{
                     ...modernButtonStyle,
-                    background: "linear-gradient(135deg, #64748b, #475569)",
+                    background: "linear-gradient(135deg, #94a3b8, #64748b)",
                     width: "100%"
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
                     e.target.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
+                    e.target.style.background = "linear-gradient(135deg, #94a3b8, #64748b)";
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
@@ -681,16 +753,16 @@ export default function Dashboard() {
                   disabled={!token || loading}
                   style={{
                     ...modernButtonStyle,
-                    background: "linear-gradient(135deg, #475569, #334155)",
+                    background: "linear-gradient(135deg, #64748b, #475569)",
                     marginBottom: "16px",
                     width: "100%"
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #334155, #1e293b)";
+                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
                     e.target.style.transform = "translateY(-2px)";
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                    e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
                     e.target.style.transform = "translateY(0)";
                   }}
                 >
@@ -792,15 +864,15 @@ export default function Dashboard() {
                 disabled={loading}
                 style={{
                   ...modernButtonStyle,
-                  background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                  background: "linear-gradient(135deg, #64748b, #475569)",
                   width: "100%"
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.background = "linear-gradient(135deg, #2563eb, #1e40af)";
+                  e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
                   e.target.style.transform = "translateY(-2px)";
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.background = "linear-gradient(135deg, #3b82f6, #1d4ed8)";
+                  e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
                   e.target.style.transform = "translateY(0)";
                 }}
               >
@@ -853,7 +925,6 @@ export default function Dashboard() {
               </>
             )}
           </div>
-
 
         </div>
         

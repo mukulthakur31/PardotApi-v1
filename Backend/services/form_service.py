@@ -35,6 +35,9 @@ def fetch_all_activities(headers):
     
     return all_activities
 
+
+
+
 def calculate_form_stats(form, activities_by_form):
     """Calculate statistics for a single form"""
     form_id = str(form["id"])
@@ -48,8 +51,12 @@ def calculate_form_stats(form, activities_by_form):
     def get_unique_count(activities):
         return len({a.get("visitor_id") or a.get("prospect_id") for a in activities if a.get("visitor_id") or a.get("prospect_id")})
     
-    # Calculate conversion rate
-    conversion_rate = (len(submissions) / len(views) * 100) if views else 0
+    # Calculate abandonment metrics
+    total_views = len(views)
+    total_submissions = len(submissions)
+    abandoned = total_views - total_submissions if total_views > total_submissions else 0
+    abandonment_rate = (abandoned / total_views * 100) if total_views > 0 else 0
+    conversion_rate = (total_submissions / total_views * 100) if total_views > 0 else 0
     
     # Check if form is active (has activity in last 30 days)
     thirty_days_ago = datetime.now() - timedelta(days=30)
@@ -60,10 +67,12 @@ def calculate_form_stats(form, activities_by_form):
     return {
         "id": form_id,
         "name": form["name"],
-        "views": len(views),
+        "views": total_views,
         "unique_views": get_unique_count(views),
-        "submissions": len(submissions),
+        "submissions": total_submissions,
         "unique_submissions": get_unique_count(submissions),
+        "abandoned": abandoned,
+        "abandonment_rate": round(abandonment_rate, 2),
         "clicks": len(clicks),
         "unique_clicks": get_unique_count(clicks),
         "conversions": len([a for a in submissions if a.get("prospect_id")]),
@@ -71,6 +80,7 @@ def calculate_form_stats(form, activities_by_form):
         "is_active": is_active,
         "last_activity": max([a.get("created_at") for a in form_activities], default=None) if form_activities else None
     }
+
 
 def get_form_stats(access_token):
     """Main function to get form statistics"""
@@ -125,6 +135,62 @@ def get_form_stats(access_token):
         import traceback
         traceback.print_exc()
         raise e
+
+
+
+
+def get_form_abandonment_analysis(access_token):
+    """Analyze form abandonment patterns and issues"""
+    try:
+        form_stats = get_form_stats(access_token)
+        
+        # Categorize forms by abandonment rate
+        high_abandonment = [f for f in form_stats if f["abandonment_rate"] > 70 and f["views"] > 10]
+        medium_abandonment = [f for f in form_stats if 40 <= f["abandonment_rate"] <= 70 and f["views"] > 5]
+        low_abandonment = [f for f in form_stats if f["abandonment_rate"] < 40 and f["views"] > 0]
+        
+        # Calculate overall metrics
+        total_views = sum(f["views"] for f in form_stats)
+        total_submissions = sum(f["submissions"] for f in form_stats)
+        total_abandoned = sum(f["abandoned"] for f in form_stats)
+        
+        return {
+            "summary": {
+                "total_forms": len(form_stats),
+                "total_views": total_views,
+                "total_submissions": total_submissions,
+                "total_abandoned": total_abandoned,
+                "overall_abandonment_rate": round((total_abandoned / total_views * 100), 2) if total_views > 0 else 0,
+                "overall_conversion_rate": round((total_submissions / total_views * 100), 2) if total_views > 0 else 0
+            },
+            "categories": {
+                "high_abandonment": {
+                    "count": len(high_abandonment),
+                    "threshold": ">70%",
+                    "forms": high_abandonment
+                },
+                "medium_abandonment": {
+                    "count": len(medium_abandonment),
+                    "threshold": "40-70%",
+                    "forms": medium_abandonment
+                },
+                "low_abandonment": {
+                    "count": len(low_abandonment),
+                    "threshold": "<40%",
+                    "forms": low_abandonment
+                }
+            },
+            "insights": {
+                "forms_needing_attention": len(high_abandonment),
+                "avg_abandonment_rate": round(sum(f["abandonment_rate"] for f in form_stats) / len(form_stats), 2) if form_stats else 0,
+                "best_performing_form": min([f for f in form_stats if f["views"] > 0], key=lambda x: x["abandonment_rate"]) if [f for f in form_stats if f["views"] > 0] else None,
+                "worst_performing_form": max([f for f in form_stats if f["views"] > 0], key=lambda x: x["abandonment_rate"]) if [f for f in form_stats if f["views"] > 0] else None
+            }
+        }
+    except Exception as e:
+        print(f"Error in get_form_abandonment_analysis: {str(e)}")
+        raise e
+
 
 
 

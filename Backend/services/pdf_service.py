@@ -355,8 +355,8 @@ def create_insights_section(stats_list):
     content.append(insights_table)
     return content
 
-def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health):
-    """Generate comprehensive summary PDF with all data"""
+def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, landing_page_stats=None):
+    """Generate improved comprehensive audit report with executive summary and critical issues"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
     
@@ -368,129 +368,162 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health):
                                 fontSize=24, spaceAfter=20, alignment=1, 
                                 textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
     
-    content.append(Paragraph("📊 PARDOT COMPREHENSIVE ANALYTICS REPORT", header_style))
+    content.append(Paragraph("📊 PARDOT COMPREHENSIVE AUDIT REPORT", header_style))
     content.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
                            ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, spaceAfter=30, alignment=1, textColor=colors.HexColor('#6b7280'))))
     
-    # Table of Contents
-    content.extend(create_table_of_contents())
+    # Executive Summary (replaces TOC and metrics table)
+    content.extend(create_executive_summary_paragraph(email_stats, form_stats, prospect_health, landing_page_stats))
+    content.append(Spacer(1, 0.3*inch))
+    
+    # Critical Issues Section
+    content.extend(create_critical_issues_section(email_stats, form_stats, prospect_health, landing_page_stats))
     content.append(PageBreak())
     
-    # Executive Summary
-    content.extend(create_detailed_executive_summary(email_stats, form_stats, prospect_health))
+    # Data Visualizations with insights
+    content.extend(create_insightful_visualizations(email_stats, form_stats, prospect_health, landing_page_stats))
     content.append(PageBreak())
     
-    # Email Analytics Section
-    content.extend(create_detailed_email_section(email_stats))
+    # Tailored Recommendations
+    content.extend(create_tailored_recommendations(email_stats, form_stats, prospect_health, landing_page_stats))
     content.append(PageBreak())
     
-    # Form Analytics Section
-    content.extend(create_detailed_form_section(form_stats))
-    content.append(PageBreak())
-    
-    # Prospect Health Section
-    content.extend(create_detailed_prospect_section(prospect_health))
-    content.append(PageBreak())
-    
-    # Recommendations Section
-    content.extend(create_recommendations_section(email_stats, form_stats, prospect_health))
+    # Next Steps Section
+    content.extend(create_next_steps_section(email_stats, form_stats, prospect_health, landing_page_stats))
     
     doc.build(content)
     buffer.seek(0)
     return buffer
 
-def create_table_of_contents():
-    """Create table of contents"""
-    styles = getSampleStyleSheet()
-    content = []
-    
-    toc_style = ParagraphStyle('TOCHeader', parent=styles['Heading2'], 
-                             fontSize=18, spaceAfter=16, 
-                             textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
-    
-    content.append(Paragraph("📋 TABLE OF CONTENTS", toc_style))
-    
-    toc_items = [
-        "1. Executive Summary",
-        "2. Email Campaign Analytics",
-        "   2.1 Campaign Performance Overview",
-        "   2.2 Engagement Metrics Analysis",
-        "   2.3 Top Performing Campaigns",
-        "   2.4 Industry Benchmark Comparison",
-        "3. Form Performance Analytics",
-        "   3.1 Form Conversion Analysis",
-        "   3.2 User Engagement Patterns",
-        "   3.3 Form Optimization Insights",
-        "4. Prospect Database Health",
-        "   4.1 Data Quality Assessment",
-        "   4.2 Prospect Segmentation Analysis",
-        "   4.3 Database Cleanup Recommendations",
-        "5. Strategic Recommendations",
-        "   5.1 Email Marketing Optimization",
-        "   5.2 Form Conversion Improvement",
-        "   5.3 Database Management Strategy"
-    ]
-    
-    for item in toc_items:
-        indent = 0 if item.startswith(("1.", "2.", "3.", "4.", "5.")) else 20
-        content.append(Paragraph(f"<para leftIndent='{indent}'>{item}</para>", styles['Normal']))
-        content.append(Spacer(1, 4))
-    
-    return content
-
-def create_detailed_executive_summary(email_stats, form_stats, prospect_health):
-    """Create executive summary with key metrics"""
+def create_executive_summary_paragraph(email_stats, form_stats, prospect_health, landing_page_stats=None):
+    """Create executive summary paragraph with key highlights"""
     styles = getSampleStyleSheet()
     content = []
     
     # Section header
-    section_style = ParagraphStyle('ExecSection', parent=styles['Heading2'], 
+    summary_style = ParagraphStyle('ExecSummary', parent=styles['Heading2'], 
                                  fontSize=18, spaceAfter=16, 
                                  textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
     
-    content.append(Paragraph("📈 EXECUTIVE SUMMARY", section_style))
+    content.append(Paragraph("📊 EXECUTIVE SUMMARY", summary_style))
     
-    # Calculate totals
+    # Calculate key metrics
     total_emails = len(email_stats) if email_stats else 0
-    total_email_sent = sum(email.get('stats', {}).get('sent', 0) for email in email_stats) if email_stats else 0
-    total_email_opens = sum(email.get('stats', {}).get('opens', 0) for email in email_stats) if email_stats else 0
-    
     total_forms = len(form_stats) if form_stats else 0
+    total_prospects = prospect_health.get('total_prospects', 0) if prospect_health else 0
+    
+    # Email metrics
+    total_delivered = sum(email.get('stats', {}).get('delivered', 0) for email in email_stats) if email_stats else 0
+    total_opens = sum(email.get('stats', {}).get('opens', 0) for email in email_stats) if email_stats else 0
+    total_clicks = sum(email.get('stats', {}).get('clicks', 0) for email in email_stats) if email_stats else 0
+    total_bounces = sum(email.get('stats', {}).get('bounces', 0) for email in email_stats) if email_stats else 0
+    
+    open_rate = (total_opens / total_delivered * 100) if total_delivered > 0 else 0
+    click_rate = (total_clicks / total_delivered * 100) if total_delivered > 0 else 0
+    bounce_rate = (total_bounces / total_delivered * 100) if total_delivered > 0 else 0
+    
+    # Form metrics
     total_form_views = sum(form.get('views', 0) for form in form_stats) if form_stats else 0
     total_form_submissions = sum(form.get('submissions', 0) for form in form_stats) if form_stats else 0
+    form_conversion_rate = (total_form_submissions / total_form_views * 100) if total_form_views > 0 else 0
     
-    total_prospects = prospect_health.get('total_prospects', 0) if prospect_health else 0
-    duplicate_prospects = prospect_health.get('duplicates', {}).get('count', 0) if prospect_health else 0
-    inactive_prospects = prospect_health.get('inactive_prospects', {}).get('count', 0) if prospect_health else 0
+    # Prospect issues
+    duplicates = prospect_health.get('duplicates', {}).get('count', 0) if prospect_health else 0
+    inactive = prospect_health.get('inactive_prospects', {}).get('count', 0) if prospect_health else 0
+    missing_fields = prospect_health.get('missing_fields', {}).get('count', 0) if prospect_health else 0
     
-    # Create summary cards
-    summary_data = [
-        ['METRIC', 'EMAILS', 'FORMS', 'PROSPECTS'],
-        ['Total Count', f"{total_emails:,}", f"{total_forms:,}", f"{total_prospects:,}"],
-        ['Key Activity', f"{total_email_sent:,} Sent", f"{total_form_views:,} Views", f"{duplicate_prospects:,} Duplicates"],
-        ['Engagement', f"{total_email_opens:,} Opens", f"{total_form_submissions:,} Submissions", f"{inactive_prospects:,} Inactive"]
-    ]
+    # Landing page issues
+    field_issues = len(landing_page_stats.get('field_mapping_issues', [])) if landing_page_stats else 0
     
-    summary_table = Table(summary_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#374151')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1d5db')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc'), colors.HexColor('#e5e7eb')]),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
-    ]))
+    # Create executive summary paragraph
+    summary_text = f"""Your Pardot platform currently manages <b>{total_emails:,} email campaigns</b>, <b>{total_forms:,} forms</b>, and <b>{total_prospects:,} prospects</b>. 
     
-    content.append(summary_table)
-    content.append(Spacer(1, 0.3*inch))
+    <b>Key Performance Metrics:</b> Email campaigns achieve a <b>{open_rate:.1f}% open rate</b> and <b>{click_rate:.1f}% click-through rate</b> with a <b>{bounce_rate:.1f}% bounce rate</b>. Forms maintain a <b>{form_conversion_rate:.1f}% conversion rate</b> across <b>{total_form_views:,} total views</b>.
     
-    # Add performance chart
-    content.append(create_performance_overview_chart(email_stats, form_stats, prospect_health))
+    <b>Top 3 Critical Issues Identified:</b>
+    • <b>Database Quality:</b> {duplicates:,} duplicate prospects and {inactive:,} inactive records requiring cleanup
+    • <b>Data Completeness:</b> {missing_fields:,} prospects missing critical profile information
+    • <b>Configuration Issues:</b> {field_issues:,} landing pages with field mapping problems affecting lead capture
+    
+    This audit reveals significant opportunities for optimization across email engagement, form conversion, and database health management."""
+    
+    summary_paragraph_style = ParagraphStyle('SummaryText', parent=styles['Normal'], 
+                                           fontSize=11, spaceAfter=16, 
+                                           textColor=colors.HexColor('#374151'), 
+                                           leading=16, alignment=0)
+    
+    content.append(Paragraph(summary_text, summary_paragraph_style))
+    
+    return content
+
+def create_critical_issues_section(email_stats, form_stats, prospect_health, landing_page_stats=None):
+    """Create critical issues section with urgent findings"""
+    styles = getSampleStyleSheet()
+    content = []
+    
+    # Section header
+    critical_style = ParagraphStyle('CriticalIssues', parent=styles['Heading2'], 
+                                  fontSize=18, spaceAfter=16, 
+                                  textColor=colors.HexColor('#dc2626'), fontName='Helvetica-Bold')
+    
+    content.append(Paragraph("⚠️ CRITICAL ISSUES REQUIRING IMMEDIATE ATTENTION", critical_style))
+    
+    # Identify critical issues
+    critical_issues = []
+    
+    # Email issues
+    if email_stats:
+        total_delivered = sum(email.get('stats', {}).get('delivered', 0) for email in email_stats)
+        total_clicks = sum(email.get('stats', {}).get('clicks', 0) for email in email_stats)
+        click_rate = (total_clicks / total_delivered * 100) if total_delivered > 0 else 0
+        
+        if click_rate == 0:
+            critical_issues.append("• 📧 **0% Click-Through Rate**: No email engagement indicates content relevance issues")
+        elif click_rate < 1:
+            critical_issues.append(f"• 📧 **Low CTR ({click_rate:.1f}%)**: Email content failing to drive action")
+    
+    # Form issues
+    if form_stats:
+        zero_conversion_forms = [f for f in form_stats if f.get('submissions', 0) == 0 and f.get('views', 0) > 0]
+        if zero_conversion_forms:
+            critical_issues.append(f"• 📝 **{len(zero_conversion_forms)} Forms with 0% Conversion**: Forms receiving traffic but no submissions")
+    
+    # Prospect issues
+    if prospect_health:
+        total_prospects = prospect_health.get('total_prospects', 0)
+        duplicates = prospect_health.get('duplicates', {}).get('count', 0)
+        inactive = prospect_health.get('inactive_prospects', {}).get('count', 0)
+        
+        if duplicates > total_prospects * 0.15:
+            critical_issues.append(f"• 👥 **High Duplicate Rate ({duplicates:,} records)**: {(duplicates/total_prospects*100):.1f}% of database contains duplicates")
+        
+        if inactive > total_prospects * 0.30:
+            critical_issues.append(f"• 📊 **Inactive Prospect Crisis ({inactive:,} records)**: {(inactive/total_prospects*100):.1f}% of database inactive for 90+ days")
+    
+    # Landing page issues
+    if landing_page_stats:
+        field_issues = landing_page_stats.get('field_mapping_issues', [])
+        critical_field_issues = [i for i in field_issues if i.get('severity') == 'critical']
+        
+        if critical_field_issues:
+            critical_issues.append(f"• 🚀 **Field Mapping Failures ({len(critical_field_issues)} critical)**: Landing pages not capturing lead data properly")
+    
+    # Add default issues if none found
+    if not critical_issues:
+        critical_issues = [
+            "• 📈 **Performance Optimization Needed**: Review engagement metrics for improvement opportunities",
+            "• 📊 **Database Maintenance Required**: Regular cleanup and optimization recommended",
+            "• ⚙️ **Configuration Review**: Audit system settings for optimal performance"
+        ]
+    
+    # Display critical issues
+    issue_style = ParagraphStyle('IssueText', parent=styles['Normal'], 
+                               fontSize=11, spaceAfter=12, 
+                               textColor=colors.HexColor('#dc2626'), 
+                               leading=16, leftIndent=20)
+    
+    for issue in critical_issues[:5]:  # Limit to top 5 issues
+        content.append(Paragraph(issue, issue_style))
     
     return content
 
@@ -1041,7 +1074,118 @@ def create_detailed_prospect_chart(healthy, duplicates, inactive, missing_fields
     drawing.add(title)
     return drawing
 
-def create_recommendations_section(email_stats, form_stats, prospect_health):
+def create_detailed_landing_page_section(landing_page_stats):
+    """Create detailed landing page analytics section"""
+    styles = getSampleStyleSheet()
+    content = []
+    
+    section_style = ParagraphStyle('LandingPageSection', parent=styles['Heading2'], 
+                                 fontSize=20, spaceAfter=16, 
+                                 textColor=colors.HexColor('#f59e0b'), fontName='Helvetica-Bold')
+    
+    content.append(Paragraph("🚀 5. LANDING PAGE ANALYTICS", section_style))
+    
+    if not landing_page_stats:
+        content.append(Paragraph("No landing page data available for analysis.", styles['Normal']))
+        return content
+    
+    # Section overview
+    overview_style = ParagraphStyle('LandingPageOverview', parent=styles['Normal'], 
+                                  fontSize=11, spaceAfter=16, 
+                                  textColor=colors.HexColor('#374151'), 
+                                  leading=16, alignment=0)
+    
+    total_pages = landing_page_stats.get('total_landing_pages', 0)
+    active_pages = len(landing_page_stats.get('active_forms', []))
+    inactive_pages = len(landing_page_stats.get('inactive_forms', []))
+    field_issues = len(landing_page_stats.get('field_mapping_issues', []))
+    
+    content.append(Paragraph(
+        f"This section analyzes {total_pages} landing pages in your Pardot system, examining page performance, "
+        f"field mapping configurations, and conversion optimization opportunities. Landing pages serve as critical "
+        f"conversion points in your marketing funnel, and proper configuration is essential for lead capture effectiveness.", 
+        overview_style
+    ))
+    
+    content.append(Spacer(1, 0.2*inch))
+    
+    # 5.1 Page Performance Overview
+    content.append(Paragraph("📊 5.1 Page Performance Overview", 
+                           ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
+    
+    performance_data = [
+        ['LANDING PAGE METRIC', 'VALUE', 'STATUS'],
+        ['Total Landing Pages', f"{total_pages:,}", '🟢 Active'],
+        ['Active Pages (30 days)', f"{active_pages:,}", f"🟢 {(active_pages/total_pages*100):.1f}%" if total_pages > 0 else '0%'],
+        ['Inactive Pages', f"{inactive_pages:,}", f"🟡 {(inactive_pages/total_pages*100):.1f}%" if total_pages > 0 else '0%'],
+        ['Field Mapping Issues', f"{field_issues:,}", '🔴 Critical' if field_issues > total_pages * 0.2 else '🟡 Medium' if field_issues > 0 else '🟢 Clean']
+    ]
+    
+    performance_table = Table(performance_data, colWidths=[2.5*inch, 1.2*inch, 1.3*inch])
+    performance_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef3c7')]),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
+    ]))
+    
+    content.append(performance_table)
+    content.append(Spacer(1, 0.3*inch))
+    
+    # 5.2 Field Mapping Issues Analysis
+    if field_issues > 0:
+        content.append(Paragraph("⚠️ 5.2 Field Mapping Issues Analysis", 
+                               ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
+        
+        # Categorize issues by severity
+        issues = landing_page_stats.get('field_mapping_issues', [])
+        critical_issues = [i for i in issues if i.get('severity') == 'critical']
+        high_issues = [i for i in issues if i.get('severity') == 'high']
+        medium_issues = [i for i in issues if i.get('severity') == 'medium']
+        
+        issues_data = [
+            ['ISSUE SEVERITY', 'COUNT', 'IMPACT'],
+            ['Critical Issues', f"{len(critical_issues):,}", '🔴 Immediate Action Required'],
+            ['High Priority Issues', f"{len(high_issues):,}", '🟡 Address Soon'],
+            ['Medium Priority Issues', f"{len(medium_issues):,}", '🟠 Plan Resolution']
+        ]
+        
+        issues_table = Table(issues_data, colWidths=[2*inch, 1*inch, 2*inch])
+        issues_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fee2e2')]),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
+        ]))
+        
+        content.append(issues_table)
+        content.append(Spacer(1, 0.2*inch))
+        
+        # Top issues list
+        content.append(Paragraph("🔍 Critical Issues Requiring Immediate Attention:", 
+                               ParagraphStyle('IssuesHeader', parent=styles['Normal'], fontSize=11, spaceAfter=8, fontName='Helvetica-Bold')))
+        
+        for issue in critical_issues[:5]:  # Show top 5 critical issues
+            content.append(Paragraph(f"• {issue.get('field_name', 'Unknown')}: {issue.get('issue', 'No description')}", 
+                                   ParagraphStyle('Issue', parent=styles['Normal'], fontSize=9, spaceAfter=4, leftIndent=20)))
+    
+    return content
+
+def create_recommendations_section(email_stats, form_stats, prospect_health, landing_page_stats=None):
     """Create strategic recommendations section"""
     styles = getSampleStyleSheet()
     content = []
@@ -1050,7 +1194,7 @@ def create_recommendations_section(email_stats, form_stats, prospect_health):
                                  fontSize=20, spaceAfter=16, 
                                  textColor=colors.HexColor('#7c3aed'), fontName='Helvetica-Bold')
     
-    content.append(Paragraph("💡 5. STRATEGIC RECOMMENDATIONS", section_style))
+    content.append(Paragraph("💡 6. STRATEGIC RECOMMENDATIONS", section_style))
     
     # Section overview
     overview_style = ParagraphStyle('RecommendationsOverview', parent=styles['Normal'], 
@@ -1099,8 +1243,26 @@ def create_recommendations_section(email_stats, form_stats, prospect_health):
     
     content.append(Spacer(1, 0.2*inch))
     
-    # 5.3 Database Management Strategy
-    content.append(Paragraph("🏥 5.3 Database Management Strategy", 
+    # 5.3 Landing Page Optimization (if data available)
+    if landing_page_stats:
+        content.append(Paragraph("🚀 5.3 Landing Page Optimization", 
+                               ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
+        
+        landing_recommendations = [
+            "• Field Mapping Audit: Review and fix CRM field connections to ensure proper lead data capture",
+            "• Form Integration: Ensure all landing pages have properly configured forms for lead generation",
+            "• URL Configuration: Verify all pages have accessible URLs and proper vanity URL setup",
+            "• Mobile Responsiveness: Test landing page performance across all device types",
+            "• Conversion Tracking: Implement proper analytics to measure page performance and ROI"
+        ]
+        
+        for rec in landing_recommendations:
+            content.append(Paragraph(rec, ParagraphStyle('Recommendation', parent=styles['Normal'], fontSize=10, spaceAfter=8, leftIndent=20)))
+        
+        content.append(Spacer(1, 0.2*inch))
+    
+    # 5.4 Database Management Strategy
+    content.append(Paragraph("🏥 5.4 Database Management Strategy", 
                            ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'))))
     
     database_recommendations = [

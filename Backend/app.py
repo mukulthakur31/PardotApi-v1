@@ -10,7 +10,7 @@ from utils.auth_utils import get_credentials, extract_access_token
 
 # Import services
 from services.email_service import get_email_stats
-from services.form_service import get_form_stats, get_active_inactive_forms
+from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis
 from services.Landing_page_service import get_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies
 from services.pdf_service import create_professional_pdf_report, create_form_pdf_report, create_prospect_pdf_report, create_comprehensive_summary_pdf
@@ -137,6 +137,18 @@ def get_active_inactive_forms_route():
     try:
         forms_data = get_active_inactive_forms(access_token)
         return jsonify(forms_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-form-abandonment-analysis", methods=["GET"])
+def get_form_abandonment_analysis_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
+    try:
+        abandonment_data = get_form_abandonment_analysis(access_token)
+        return jsonify(abandonment_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -334,9 +346,10 @@ def download_summary_pdf():
         email_stats = get_email_stats(access_token)
         form_stats = get_form_stats(access_token)
         prospect_health = get_prospect_health(access_token)
+        landing_page_stats = get_landing_page_stats(access_token)
         
         # Generate comprehensive PDF
-        buffer = create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health)
+        buffer = create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, landing_page_stats)
         
         return send_file(buffer, as_attachment=True, download_name="pardot_comprehensive_report.pdf", mimetype="application/pdf")
     except Exception as e:

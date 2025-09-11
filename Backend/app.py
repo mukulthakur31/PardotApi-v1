@@ -10,7 +10,8 @@ from utils.auth_utils import get_credentials, extract_access_token
 
 # Import services
 from services.email_service import get_email_stats
-from services.form_service import get_form_stats
+from services.form_service import get_form_stats, get_active_inactive_forms
+from services.Landing_page_service import get_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies
 from services.pdf_service import create_professional_pdf_report, create_form_pdf_report, create_prospect_pdf_report, create_comprehensive_summary_pdf
 
@@ -126,6 +127,65 @@ def get_form_stats_route():
         return jsonify(form_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/get-active-inactive-forms", methods=["GET"])
+def get_active_inactive_forms_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
+    try:
+        forms_data = get_active_inactive_forms(access_token)
+        return jsonify(forms_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ===== Landing Page Routes =====
+@app.route("/get-landing-page-stats", methods=["GET"])
+def get_landing_page_stats_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
+    try:
+        landing_page_stats = get_landing_page_stats(access_token)
+        return jsonify(landing_page_stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-landing-page-field-issues", methods=["GET"])
+def get_landing_page_field_issues():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
+    try:
+        severity = request.args.get("severity", "all").lower()
+        issue_type = request.args.get("type", "all").lower()
+        
+        landing_page_stats = get_landing_page_stats(access_token)
+        field_issues = landing_page_stats.get('field_mapping_issues', {})
+        
+        if severity != "all" and severity in field_issues:
+            filtered_issues = field_issues[severity]
+        else:
+            filtered_issues = field_issues.get('all_issues', [])
+        
+        if issue_type != "all":
+            filtered_issues = [issue for issue in filtered_issues if issue.get('type') == issue_type]
+        
+        return jsonify({
+            "field_mapping_issues": filtered_issues,
+            "configuration_issues": landing_page_stats.get('configuration_issues', []),
+            "summary": field_issues.get('summary', {}),
+            "filters_applied": {
+                "severity": severity,
+                "type": issue_type
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # ===== Prospect Routes =====
 @app.route("/get-prospect-health", methods=["GET"])

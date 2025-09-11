@@ -1,6 +1,7 @@
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
+from datetime import datetime, timedelta
 from utils.auth_utils import get_credentials
 
 def fetch_all_activities(headers):
@@ -47,6 +48,15 @@ def calculate_form_stats(form, activities_by_form):
     def get_unique_count(activities):
         return len({a.get("visitor_id") or a.get("prospect_id") for a in activities if a.get("visitor_id") or a.get("prospect_id")})
     
+    # Calculate conversion rate
+    conversion_rate = (len(submissions) / len(views) * 100) if views else 0
+    
+    # Check if form is active (has activity in last 30 days)
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    recent_activities = [a for a in form_activities if a.get("created_at") and 
+                        datetime.fromisoformat(a["created_at"].replace('Z', '+00:00')) > thirty_days_ago]
+    is_active = len(recent_activities) > 0
+    
     return {
         "id": form_id,
         "name": form["name"],
@@ -56,7 +66,10 @@ def calculate_form_stats(form, activities_by_form):
         "unique_submissions": get_unique_count(submissions),
         "clicks": len(clicks),
         "unique_clicks": get_unique_count(clicks),
-        "conversions": len([a for a in submissions if a.get("prospect_id")])
+        "conversions": len([a for a in submissions if a.get("prospect_id")]),
+        "conversion_rate": round(conversion_rate, 2),
+        "is_active": is_active,
+        "last_activity": max([a.get("created_at") for a in form_activities], default=None) if form_activities else None
     }
 
 def get_form_stats(access_token):
@@ -111,4 +124,34 @@ def get_form_stats(access_token):
         print(f"Error in get_form_stats: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise e
+
+
+
+def get_active_inactive_forms(access_token):
+    """Get categorized active and inactive forms"""
+    try:
+        form_stats = get_form_stats(access_token)
+        
+        active_forms = [form for form in form_stats if form["is_active"]]
+        inactive_forms = [form for form in form_stats if not form["is_active"]]
+        
+        return {
+            "active_forms": {
+                "count": len(active_forms),
+                "forms": active_forms
+            },
+            "inactive_forms": {
+                "count": len(inactive_forms),
+                "forms": inactive_forms
+            },
+            "summary": {
+                "total_forms": len(form_stats),
+                "active_percentage": round((len(active_forms) / len(form_stats) * 100), 2) if form_stats else 0,
+                "avg_conversion_rate_active": round(sum(f["conversion_rate"] for f in active_forms) / len(active_forms), 2) if active_forms else 0,
+                "avg_conversion_rate_inactive": round(sum(f["conversion_rate"] for f in inactive_forms) / len(inactive_forms), 2) if inactive_forms else 0
+            }
+        }
+    except Exception as e:
+        print(f"Error in get_active_inactive_forms: {str(e)}")
         raise e

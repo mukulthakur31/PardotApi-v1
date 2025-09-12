@@ -13,7 +13,9 @@ from services.email_service import get_email_stats
 from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis
 from services.Landing_page_service import get_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies
+from services.engagement_service import get_engagement_programs_analysis, get_engagement_programs_performance
 from services.pdf_service import create_professional_pdf_report, create_form_pdf_report, create_prospect_pdf_report, create_comprehensive_summary_pdf
+
 
 # Import Google integration
 from google_integration import GoogleIntegration
@@ -233,7 +235,7 @@ def get_inactive_prospects():
             "inactive_prospects": inactive_prospects
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500({"error": str(e)}), 500
 
 @app.route("/get-duplicate-prospects", methods=["GET"])
 def get_duplicate_prospects():
@@ -301,6 +303,31 @@ def get_scoring_issues_prospects():
             "total_scoring_issues": len(scoring_issues),
             "prospects_with_scoring_issues": scoring_issues
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ===== Engagement Programs Routes =====
+@app.route("/get-engagement-programs-analysis", methods=["GET"])
+def get_engagement_programs_analysis_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        analysis_data = get_engagement_programs_analysis(access_token)
+        return jsonify(analysis_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-engagement-programs-performance", methods=["GET"])
+def get_engagement_programs_performance_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token required"}), 401
+    
+    try:
+        performance_data = get_engagement_programs_performance(access_token)
+        return jsonify(performance_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -4,6 +4,7 @@ import EmailSection from "./sections/EmailSection";
 import FormsSection from "./sections/FormsSection";
 import LandingPagesSection from "./sections/LandingPagesSection";
 import ProspectsSection from "./sections/ProspectsSection";
+import EngagementSection from "./sections/EngagementSection";
 import StatusCards from "./sections/StatusCards";
 import DateFilters from "./sections/DateFilters";
 import ActionTiles from "./sections/ActionTiles";
@@ -80,6 +81,9 @@ export default function Dashboard() {
   const [activeFormView, setActiveFormView] = useState(null);
   const [activeLandingPageView, setActiveLandingPageView] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  
+  // Engagement states
+  const [engagementAnalysis, setEngagementAnalysis] = useState(null);
 
   const [day, setDay] = useState("");
   const [month, setMonth] = useState("");
@@ -260,6 +264,20 @@ export default function Dashboard() {
       .then((res) => {
         setLandingPageStats(res.data);
         setActiveLandingPageView('overview');
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  // Engagement functions
+  const getEngagementAnalysis = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-engagement-programs-analysis", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setEngagementAnalysis(res.data);
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -526,7 +544,8 @@ export default function Dashboard() {
           { id: "emails", label: "📧 Emails" },
           { id: "forms", label: "📝 Forms" },
           { id: "prospects", label: "👥 Prospects" },
-          { id: "landing-pages", label: "🚀 Landing Pages" }
+          { id: "landing-pages", label: "🚀 Landing Pages" },
+          { id: "engagement", label: "🎯 Engagement" }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -604,6 +623,7 @@ export default function Dashboard() {
           getFormAbandonmentAnalysis={getFormAbandonmentAnalysis}
           getLandingPageStats={getLandingPageStats}
           getProspectHealth={getProspectHealth}
+          getEngagementPrograms={getEngagementAnalysis}
           downloadPDF={downloadPDF}
           authenticateGoogle={authenticateGoogle}
           exportToSheets={exportToSheets}
@@ -666,6 +686,13 @@ export default function Dashboard() {
             getInactiveProspects={getInactiveProspects}
             getMissingFieldsProspects={getMissingFieldsProspects}
             getScoringIssuesProspects={getScoringIssuesProspects}
+          />
+        )}
+        
+        {activeTab === "engagement" && (
+          <EngagementSection 
+            engagementAnalysis={engagementAnalysis}
+            getEngagementAnalysis={getEngagementAnalysis}
           />
         )}
       </div>

@@ -356,44 +356,629 @@ def create_insights_section(stats_list):
     return content
 
 def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, landing_page_stats=None):
-    """Generate improved comprehensive audit report with executive summary and critical issues"""
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
+    """Generate comprehensive Pardot Audit Report with professional structure"""
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
+        
+        content = []
+        styles = getSampleStyleSheet()
+        
+        # Enhanced custom styles
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, spaceAfter=20, alignment=1, textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
+        section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=18, spaceAfter=16, textColor=colors.HexColor('#3b82f6'), fontName='Helvetica-Bold')
+        subsection_style = ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
+        body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=11, spaceAfter=12, textColor=colors.HexColor('#374151'), leading=16)
+        highlight_style = ParagraphStyle('Highlight', parent=styles['Normal'], fontSize=12, spaceAfter=12, textColor=colors.HexColor('#dc2626'), fontName='Helvetica-Bold', backColor=colors.HexColor('#fef2f2'), borderPadding=8)
+        
+        # COVER PAGE
+        content.append(Spacer(1, 2*inch))
+        content.append(Paragraph("Pardot Audit Report", title_style))
+        content.append(Spacer(1, 0.5*inch))
+        content.append(Paragraph("[Company Name]", subtitle_style))
+        content.append(Spacer(1, 0.3*inch))
+        content.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", subtitle_style))
+        content.append(Spacer(1, 1*inch))
+        
+        # EXECUTIVE SUMMARY WITH ENHANCED LAYOUT
+        content.append(Paragraph("📈 EXECUTIVE SUMMARY", section_style))
+        
+        # Add executive summary text
+        exec_summary = f"""This comprehensive audit analyzes your Pardot marketing automation platform across four critical areas: 
+        email campaign performance, form conversion optimization, prospect database health, and landing page effectiveness. 
+        Our analysis reveals key opportunities for improving engagement rates, conversion performance, and database quality 
+        to maximize your marketing ROI and sales pipeline effectiveness."""
+        
+        content.append(Paragraph(exec_summary, body_style))
+        content.append(Spacer(1, 0.2*inch))
+        
+        summary_data = [
+            ['METRIC', 'COUNT', 'STATUS'],
+            ['Email Campaigns', f"{len(email_stats) if email_stats else 0:,}", '🟢 Active'],
+            ['Forms Deployed', f"{len(form_stats) if form_stats else 0:,}", '🟢 Operational'],
+            ['Prospect Records', f"{prospect_health.get('total_prospects', 0) if prospect_health else 0:,}", '🟢 Database'],
+            ['Landing Pages', f"{landing_page_stats.get('total_landing_pages', 0) if landing_page_stats else 0:,}", '🟢 Published']
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('ROUNDEDCORNERS', [5, 5, 5, 5])
+        ]))
+        content.append(summary_table)
+        content.append(Spacer(1, 0.3*inch))
+        
+        # Add key metrics highlight box
+        if email_stats and form_stats and prospect_health:
+            total_emails = len(email_stats)
+            total_forms = len(form_stats)
+            total_prospects = prospect_health.get('total_prospects', 0)
+            
+            # Calculate key performance indicators
+            total_delivered = sum(email.get('stats', {}).get('delivered', 0) for email in email_stats)
+            total_opens = sum(email.get('stats', {}).get('opens', 0) for email in email_stats)
+            open_rate = (total_opens / total_delivered * 100) if total_delivered > 0 else 0
+            
+            total_form_views = sum(form.get('views', 0) for form in form_stats)
+            total_form_submissions = sum(form.get('submissions', 0) for form in form_stats)
+            form_conversion = (total_form_submissions / total_form_views * 100) if total_form_views > 0 else 0
+            
+            duplicates = prospect_health.get('duplicates', {}).get('count', 0)
+            database_health = ((total_prospects - duplicates) / total_prospects * 100) if total_prospects > 0 else 100
+            
+            kpi_text = f"""<b>KEY PERFORMANCE INDICATORS:</b><br/>
+            • Email Open Rate: <b>{open_rate:.1f}%</b> {'(🔴 Below 20%)' if open_rate < 20 else '(🟡 Average)' if open_rate < 25 else '(🟢 Excellent)'}<br/>
+            • Form Conversion Rate: <b>{form_conversion:.1f}%</b> {'(🔴 Below 15%)' if form_conversion < 15 else '(🟡 Good)' if form_conversion < 25 else '(🟢 Excellent)'}<br/>
+            • Database Health Score: <b>{database_health:.1f}%</b> {'(🔴 Critical)' if database_health < 70 else '(🟡 Needs Attention)' if database_health < 85 else '(🟢 Healthy)'}"""
+            
+            content.append(Paragraph(kpi_text, highlight_style))
+            content.append(Spacer(1, 0.3*inch))
+        
+        content.append(PageBreak())
+        
+        # EMAIL CAMPAIGN ANALYSIS WITH ENHANCED VISUALS
+        if email_stats:
+            content.append(Paragraph("📧 EMAIL CAMPAIGN PERFORMANCE", section_style))
+            
+            # Add section overview
+            email_overview = f"""Analysis of {len(email_stats)} email campaigns reveals critical insights into audience engagement, 
+            content effectiveness, and delivery optimization opportunities. Email marketing continues to deliver the highest ROI 
+            among digital marketing channels, making performance optimization essential for marketing success."""
+            
+            content.append(Paragraph(email_overview, body_style))
+            content.append(Spacer(1, 0.2*inch))
+            
+            # Calculate email metrics
+            total_sent = sum(email.get('stats', {}).get('sent', 0) for email in email_stats)
+            total_delivered = sum(email.get('stats', {}).get('delivered', 0) for email in email_stats)
+            total_opens = sum(email.get('stats', {}).get('opens', 0) for email in email_stats)
+            total_clicks = sum(email.get('stats', {}).get('clicks', 0) for email in email_stats)
+            
+            open_rate = (total_opens / total_delivered * 100) if total_delivered > 0 else 0
+            click_rate = (total_clicks / total_delivered * 100) if total_delivered > 0 else 0
+            
+            email_metrics_data = [
+                ['METRIC', 'VALUE', 'BENCHMARK', 'STATUS'],
+                ['Total Campaigns', f"{len(email_stats):,}", 'N/A', '🟢 Active'],
+                ['Emails Sent', f"{total_sent:,}", 'N/A', '🟢 Volume'],
+                ['Open Rate', f"{open_rate:.1f}%", '20-25%', '🟢 Good' if open_rate >= 20 else '🟡 Average'],
+                ['Click Rate', f"{click_rate:.1f}%", '2-5%', '🟢 Good' if click_rate >= 2 else '🟡 Average']
+            ]
+            
+            email_table = Table(email_metrics_data, colWidths=[1.8*inch, 1.2*inch, 1.2*inch, 1.3*inch])
+            email_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#dbeafe')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(email_table)
+            
+            # Top performing campaigns
+            content.append(Spacer(1, 0.15*inch))
+            content.append(Paragraph("🏆 Top Performing Campaigns", ParagraphStyle('SubHeader', parent=styles['Normal'], fontSize=11, spaceAfter=6, fontName='Helvetica-Bold')))
+            
+            top_campaigns = sorted(email_stats, key=lambda x: x.get('stats', {}).get('opens', 0) + x.get('stats', {}).get('clicks', 0), reverse=True)[:8]
+            
+            campaign_data = [['CAMPAIGN NAME', 'SENT', 'OPENS', 'CLICKS', 'OPEN %']]
+            for campaign in top_campaigns:
+                stats = campaign.get('stats', {})
+                name = campaign.get('name', 'Unknown')[:25] + '...' if len(campaign.get('name', '')) > 25 else campaign.get('name', 'Unknown')
+                sent = stats.get('sent', 0)
+                delivered = stats.get('delivered', 0)
+                opens = stats.get('opens', 0)
+                clicks = stats.get('clicks', 0)
+                open_pct = (opens / delivered * 100) if delivered > 0 else 0
+                
+                campaign_data.append([name, f"{sent:,}", f"{opens:,}", f"{clicks:,}", f"{open_pct:.1f}%"])
+            
+            campaign_table = Table(campaign_data, colWidths=[2.2*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.9*inch])
+            campaign_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f9ff')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
+            ]))
+            content.append(campaign_table)
+            
+            # Enhanced Email Performance Chart
+            try:
+                content.append(Spacer(1, 0.25*inch))
+                content.append(Paragraph("📉 Email Performance Visualization", subsection_style))
+                content.append(create_enhanced_email_chart(total_sent, total_delivered, total_opens, total_clicks))
+            except Exception as e:
+                print(f"Error creating email chart: {str(e)}")
+                
+            # Add insights box
+            insights_text = f"""<b>KEY INSIGHTS:</b><br/>
+            • Campaign Volume: {len(email_stats)} campaigns reached {total_delivered:,} recipients<br/>
+            • Engagement Rate: {((total_opens + total_clicks) / total_delivered * 100):.1f}% combined open + click rate<br/>
+            • Content Performance: {'Strong' if (total_clicks / total_delivered * 100) > 3 else 'Moderate' if (total_clicks / total_delivered * 100) > 1.5 else 'Needs Improvement'} click-through indicates content relevance<br/>
+            • List Quality: {((total_delivered / total_sent * 100) if total_sent > 0 else 100):.1f}% delivery rate shows {'excellent' if ((total_delivered / total_sent * 100) if total_sent > 0 else 100) > 95 else 'good' if ((total_delivered / total_sent * 100) if total_sent > 0 else 100) > 90 else 'concerning'} list health"""
+            
+            content.append(Spacer(1, 0.2*inch))
+            content.append(Paragraph(insights_text, ParagraphStyle('Insights', parent=body_style, backColor=colors.HexColor('#eff6ff'), borderPadding=12, borderColor=colors.HexColor('#3b82f6'), borderWidth=1)))
+        
+        content.append(PageBreak())
+        
+        # FORM PERFORMANCE ANALYSIS WITH ENHANCED LAYOUT
+        if form_stats:
+            content.append(Paragraph("📝 FORM PERFORMANCE ANALYSIS", section_style))
+            
+            # Add section overview
+            form_overview = f"""Comprehensive analysis of {len(form_stats)} marketing forms reveals conversion optimization opportunities 
+            and user experience insights. Forms serve as critical conversion points in your marketing funnel, directly impacting 
+            lead generation quality and quantity. Our analysis identifies high-performing assets and improvement areas."""
+            
+            content.append(Paragraph(form_overview, body_style))
+            content.append(Spacer(1, 0.2*inch))
+            
+            # Calculate form metrics
+            total_views = sum(form.get('views', 0) for form in form_stats)
+            total_submissions = sum(form.get('submissions', 0) for form in form_stats)
+            total_abandoned = sum(form.get('abandoned', 0) for form in form_stats)
+            conversion_rate = (total_submissions / total_views * 100) if total_views > 0 else 0
+            abandonment_rate = (total_abandoned / total_views * 100) if total_views > 0 else 0
+            
+            form_metrics_data = [
+                ['METRIC', 'VALUE', 'BENCHMARK', 'STATUS'],
+                ['Total Forms', f"{len(form_stats):,}", 'N/A', '🟢 Active'],
+                ['Total Views', f"{total_views:,}", 'N/A', '🟢 Traffic'],
+                ['Total Submissions', f"{total_submissions:,}", 'N/A', '🟢 Conversions'],
+                ['Conversion Rate', f"{conversion_rate:.1f}%", '15-25%', '🟢 Good' if conversion_rate >= 15 else '🟡 Average'],
+                ['Abandonment Rate', f"{abandonment_rate:.1f}%", '<50%', '🟢 Low' if abandonment_rate < 50 else '🔴 High']
+            ]
+            
+            form_table = Table(form_metrics_data, colWidths=[1.8*inch, 1.2*inch, 1.2*inch, 1.3*inch])
+            form_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#d1fae5')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(form_table)
+            
+            # Top performing forms
+            content.append(Spacer(1, 0.15*inch))
+            content.append(Paragraph("🏆 Top Converting Forms", ParagraphStyle('SubHeader', parent=styles['Normal'], fontSize=11, spaceAfter=6, fontName='Helvetica-Bold')))
+            
+            top_forms = sorted([f for f in form_stats if f.get('views', 0) > 0], key=lambda x: (x.get('submissions', 0) / x.get('views', 1) * 100), reverse=True)[:8]
+            
+            form_data = [['FORM NAME', 'VIEWS', 'SUBMITS', 'ABANDONED', 'CONV %']]
+            for form in top_forms:
+                name = form.get('name', 'Unknown')[:25] + '...' if len(form.get('name', '')) > 25 else form.get('name', 'Unknown')
+                views = form.get('views', 0)
+                submissions = form.get('submissions', 0)
+                abandoned = form.get('abandoned', 0)
+                conv_rate = (submissions / views * 100) if views > 0 else 0
+                
+                form_data.append([name, f"{views:,}", f"{submissions:,}", f"{abandoned:,}", f"{conv_rate:.1f}%"])
+            
+            form_perf_table = Table(form_data, colWidths=[2.2*inch, 0.8*inch, 0.8*inch, 0.8*inch, 0.9*inch])
+            form_perf_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#047857')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecfdf5')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
+            ]))
+            content.append(form_perf_table)
+            
+            # Enhanced Form Conversion Chart
+            try:
+                content.append(Spacer(1, 0.25*inch))
+                content.append(Paragraph("📉 Form Conversion Visualization", subsection_style))
+                content.append(create_enhanced_form_chart(total_views, total_submissions, total_abandoned))
+            except Exception as e:
+                print(f"Error creating form chart: {str(e)}")
+        
+        content.append(PageBreak())
+        
+        # PROSPECT DATABASE HEALTH
+        if prospect_health:
+            content.append(Paragraph("🏥 PROSPECT DATABASE HEALTH", section_style))
+            
+            total_prospects = prospect_health.get('total_prospects', 0)
+            duplicates = prospect_health.get('duplicates', {}).get('count', 0)
+            inactive = prospect_health.get('inactive_prospects', {}).get('count', 0)
+            missing_fields = prospect_health.get('missing_fields', {}).get('count', 0)
+            scoring_issues = prospect_health.get('scoring_issues', {}).get('count', 0)
+            
+            prospect_data = [
+                ['HEALTH METRIC', 'COUNT', 'PERCENTAGE', 'STATUS'],
+                ['Total Prospects', f"{total_prospects:,}", '100%', '🟢 Database'],
+                ['Duplicate Records', f"{duplicates:,}", f"{(duplicates/total_prospects*100):.1f}%" if total_prospects > 0 else '0%', '🔴 Critical' if duplicates > total_prospects * 0.1 else '🟡 Monitor'],
+                ['Inactive (90+ days)', f"{inactive:,}", f"{(inactive/total_prospects*100):.1f}%" if total_prospects > 0 else '0%', '🔴 High' if inactive > total_prospects * 0.3 else '🟡 Medium'],
+                ['Missing Critical Fields', f"{missing_fields:,}", f"{(missing_fields/total_prospects*100):.1f}%" if total_prospects > 0 else '0%', '🟡 Incomplete'],
+                ['Scoring Issues', f"{scoring_issues:,}", f"{(scoring_issues/total_prospects*100):.1f}%" if total_prospects > 0 else '0%', '🟡 Review']
+            ]
+            
+            prospect_table = Table(prospect_data, colWidths=[2*inch, 1*inch, 1*inch, 1.5*inch])
+            prospect_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fee2e2')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(prospect_table)
+            
+            # Enhanced Prospect Health Chart
+            try:
+                content.append(Spacer(1, 0.25*inch))
+                content.append(Paragraph("📉 Database Health Visualization", subsection_style))
+                content.append(create_enhanced_prospect_chart(total_prospects - duplicates - inactive - missing_fields - scoring_issues, duplicates, inactive, missing_fields, scoring_issues))
+            except Exception as e:
+                print(f"Error creating prospect chart: {str(e)}")
+        
+        # LANDING PAGE ANALYSIS
+        if landing_page_stats:
+            content.append(Spacer(1, 0.2*inch))
+            content.append(Paragraph("🚀 LANDING PAGE ANALYSIS", section_style))
+            
+            total_pages = landing_page_stats.get('total_landing_pages', 0)
+            field_issues = len(landing_page_stats.get('field_mapping_issues', []))
+            
+            landing_data = [
+                ['LANDING PAGE METRIC', 'VALUE', 'STATUS'],
+                ['Total Landing Pages', f"{total_pages:,}", '🟢 Published'],
+                ['Field Mapping Issues', f"{field_issues:,}", '🔴 Critical' if field_issues > 0 else '🟢 Clean'],
+                ['Configuration Health', f"{((total_pages - field_issues) / total_pages * 100):.1f}%" if total_pages > 0 else '100%', '🟢 Good' if field_issues == 0 else '🟡 Needs Review']
+            ]
+            
+            landing_table = Table(landing_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+            landing_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef3c7')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(landing_table)
+        
+        content.append(PageBreak())
+        
+        # ENHANCED RECOMMENDATIONS SECTION
+        content.append(Paragraph("💡 STRATEGIC RECOMMENDATIONS", section_style))
+        
+        # Add recommendations overview
+        rec_overview = """Based on comprehensive analysis of your Pardot platform performance, we have identified 
+        strategic optimization opportunities prioritized by impact and implementation complexity. These recommendations 
+        focus on maximizing ROI through improved engagement, conversion optimization, and database health management."""
+        
+        content.append(Paragraph(rec_overview, body_style))
+        content.append(Spacer(1, 0.2*inch))
+        
+        # Priority-based recommendations with enhanced styling
+        high_priority = [
+            "🔴 IMMEDIATE ACTION REQUIRED:",
+            "• Email Subject Line A/B Testing: Implement split testing to improve open rates by 15-25%",
+            "• Database Duplicate Cleanup: Remove duplicate records affecting campaign accuracy",
+            "• Mobile Email Optimization: Ensure responsive design for 60%+ mobile users"
+        ]
+        
+        medium_priority = [
+            "🟡 SHORT-TERM IMPROVEMENTS (30-60 days):",
+            "• Form Field Optimization: Reduce fields to essential information only",
+            "• Landing Page Field Mapping: Fix configuration issues affecting lead capture",
+            "• Re-engagement Campaigns: Target inactive prospects before removal"
+        ]
+        
+        long_term = [
+            "🟢 LONG-TERM STRATEGY (60+ days):",
+            "• Progressive Profiling Implementation: Gather additional data over time",
+            "• Advanced Segmentation: Create behavior-based prospect segments",
+            "• Marketing Automation Workflows: Implement nurture campaign sequences"
+        ]
+        
+        for priority_group in [high_priority, medium_priority, long_term]:
+            for i, rec in enumerate(priority_group):
+                if i == 0:  # Header
+                    content.append(Paragraph(rec, ParagraphStyle('PriorityHeader', parent=subsection_style, fontSize=12, spaceAfter=8)))
+                else:
+                    content.append(Paragraph(rec, ParagraphStyle('Rec', parent=body_style, fontSize=10, spaceAfter=6, leftIndent=20)))
+            content.append(Spacer(1, 0.15*inch))
+        
+        # Enhanced next steps with timeline
+        content.append(Paragraph("🎯 IMPLEMENTATION ROADMAP", subsection_style))
+        
+        roadmap_data = [
+            ['TIMEFRAME', 'ACTION ITEMS', 'EXPECTED IMPACT'],
+            ['Week 1-2', 'Database cleanup, Email A/B testing setup', 'Immediate data quality improvement'],
+            ['Week 3-4', 'Form optimization, Mobile responsiveness audit', '15-25% conversion rate increase'],
+            ['Month 2', 'Landing page fixes, Re-engagement campaigns', 'Improved lead capture accuracy'],
+            ['Month 3+', 'Advanced segmentation, Automation workflows', 'Long-term ROI optimization']
+        ]
+        
+        roadmap_table = Table(roadmap_data, colWidths=[1.2*inch, 2.3*inch, 1.5*inch])
+        roadmap_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#faf5ff')]),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8)
+        ]))
+        
+        content.append(roadmap_table)
+        
+        # Add footer with contact information
+        content.append(Spacer(1, 0.3*inch))
+        footer_text = """<b>Report Generated by Pardot Analytics Hub</b><br/>
+        For questions about this analysis or implementation support, please contact your marketing automation specialist.<br/>
+        Next recommended audit: 90 days from report generation date."""
+        
+        content.append(Paragraph(footer_text, ParagraphStyle('Footer', parent=body_style, fontSize=9, alignment=1, textColor=colors.HexColor('#6b7280'), spaceAfter=20)))
+        
+        doc.build(content)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        print(f"Error in create_comprehensive_summary_pdf: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise e
+
+def create_enhanced_email_chart(sent, delivered, opens, clicks):
+    """Create enhanced email performance chart with better design"""
+    drawing = Drawing(500, 280)
+    chart = VerticalBarChart()
+    chart.x = 60
+    chart.y = 80
+    chart.height = 160
+    chart.width = 380
     
-    content = []
-    styles = getSampleStyleSheet()
+    # Enhanced data with gradient colors
+    chart.data = [[sent, delivered, opens, clicks]]
+    chart.categoryAxis.categoryNames = ['Emails Sent', 'Delivered', 'Opened', 'Clicked']
+    chart.categoryAxis.labels.fontSize = 10
+    chart.categoryAxis.labels.fontName = 'Helvetica-Bold'
+    chart.valueAxis.valueMin = 0
+    chart.valueAxis.valueMax = max(sent, delivered, opens, clicks, 1) * 1.2
+    chart.valueAxis.labels.fontSize = 9
+    chart.valueAxis.labels.fontName = 'Helvetica'
     
-    # Header
-    header_style = ParagraphStyle('SummaryHeader', parent=styles['Heading1'], 
-                                fontSize=24, spaceAfter=20, alignment=1, 
-                                textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
+    # Enhanced bar styling with gradients
+    chart.bars[0].fillColor = colors.HexColor('#1e40af')
+    chart.bars.strokeColor = colors.HexColor('#1e3a8a')
+    chart.bars.strokeWidth = 1
     
-    content.append(Paragraph("📊 PARDOT COMPREHENSIVE AUDIT REPORT", header_style))
-    content.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", 
-                           ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, spaceAfter=30, alignment=1, textColor=colors.HexColor('#6b7280'))))
+    # Add background grid
+    chart.categoryAxis.visibleGrid = 1
+    chart.valueAxis.visibleGrid = 1
+    chart.categoryAxis.gridStrokeColor = colors.HexColor('#f3f4f6')
+    chart.valueAxis.gridStrokeColor = colors.HexColor('#f3f4f6')
     
-    # Executive Summary (replaces TOC and metrics table)
-    content.extend(create_executive_summary_paragraph(email_stats, form_stats, prospect_health, landing_page_stats))
-    content.append(Spacer(1, 0.3*inch))
+    from reportlab.graphics.shapes import String, Rect
     
-    # Critical Issues Section
-    content.extend(create_critical_issues_section(email_stats, form_stats, prospect_health, landing_page_stats))
-    content.append(PageBreak())
+    # Add background
+    bg_rect = Rect(0, 0, 500, 280, fillColor=colors.white, strokeColor=colors.HexColor('#e5e7eb'))
+    drawing.add(bg_rect)
     
-    # Data Visualizations with insights
-    content.extend(create_insightful_visualizations(email_stats, form_stats, prospect_health, landing_page_stats))
-    content.append(PageBreak())
+    # Enhanced title with background
+    title_bg = Rect(50, 250, 400, 25, fillColor=colors.HexColor('#1f2937'), strokeColor=None)
+    drawing.add(title_bg)
     
-    # Tailored Recommendations
-    content.extend(create_tailored_recommendations(email_stats, form_stats, prospect_health, landing_page_stats))
-    content.append(PageBreak())
+    title = String(250, 260, 'Email Campaign Performance Metrics', textAnchor='middle')
+    title.fontSize = 14
+    title.fontName = 'Helvetica-Bold'
+    title.fillColor = colors.white
     
-    # Next Steps Section
-    content.extend(create_next_steps_section(email_stats, form_stats, prospect_health, landing_page_stats))
+    # Add value labels on bars
+    bar_width = 380 / 4
+    for i, (label, value) in enumerate(zip(['Sent', 'Delivered', 'Opens', 'Clicks'], [sent, delivered, opens, clicks])):
+        x_pos = 60 + (i * bar_width) + (bar_width / 2)
+        y_pos = 80 + (value / max(sent, delivered, opens, clicks, 1) * 160) + 10
+        
+        value_label = String(x_pos, y_pos, f'{value:,}', textAnchor='middle')
+        value_label.fontSize = 8
+        value_label.fontName = 'Helvetica-Bold'
+        value_label.fillColor = colors.HexColor('#1f2937')
+        drawing.add(value_label)
     
-    doc.build(content)
-    buffer.seek(0)
-    return buffer
+    drawing.add(chart)
+    drawing.add(title)
+    return drawing
+
+def create_enhanced_form_chart(views, submissions, abandoned):
+    """Create enhanced form conversion chart with better design"""
+    drawing = Drawing(500, 280)
+    
+    # Add background
+    from reportlab.graphics.shapes import Rect
+    bg_rect = Rect(0, 0, 500, 280, fillColor=colors.white, strokeColor=colors.HexColor('#e5e7eb'))
+    drawing.add(bg_rect)
+    
+    # Enhanced pie chart
+    pie = Pie()
+    pie.x = 175
+    pie.y = 90
+    pie.width = 150
+    pie.height = 150
+    
+    # Ensure we have valid data
+    if submissions + abandoned == 0:
+        submissions = 1
+        abandoned = 0
+    
+    conversion_rate = (submissions / (submissions + abandoned) * 100) if (submissions + abandoned) > 0 else 0
+    
+    pie.data = [submissions, abandoned]
+    pie.labels = [f'Conversions\n{submissions:,} ({conversion_rate:.1f}%)', f'Abandoned\n{abandoned:,} ({100-conversion_rate:.1f}%)']
+    pie.slices.strokeWidth = 2
+    pie.slices.strokeColor = colors.white
+    pie.slices[0].fillColor = colors.HexColor('#059669')
+    pie.slices[1].fillColor = colors.HexColor('#dc2626')
+    
+    # Enhanced styling with dark text for visibility
+    pie.slices.fontName = 'Helvetica-Bold'
+    pie.slices.fontSize = 9
+    pie.slices.fontColor = colors.HexColor('#1f2937')
+    
+    from reportlab.graphics.shapes import String
+    
+    # Enhanced title with background
+    title_bg = Rect(50, 250, 400, 25, fillColor=colors.HexColor('#059669'), strokeColor=None)
+    drawing.add(title_bg)
+    
+    title = String(250, 260, 'Form Conversion Performance Analysis', textAnchor='middle')
+    title.fontSize = 14
+    title.fontName = 'Helvetica-Bold'
+    title.fillColor = colors.white
+    
+    # Add summary statistics
+    stats_text = String(250, 60, f'Total Views: {views:,} | Conversion Rate: {conversion_rate:.1f}%', textAnchor='middle')
+    stats_text.fontSize = 10
+    stats_text.fontName = 'Helvetica-Bold'
+    stats_text.fillColor = colors.HexColor('#374151')
+    
+    drawing.add(pie)
+    drawing.add(title)
+    drawing.add(stats_text)
+    return drawing
+
+def create_enhanced_prospect_chart(healthy, duplicates, inactive, missing_fields, scoring_issues):
+    """Create enhanced prospect health chart with better design"""
+    drawing = Drawing(500, 280)
+    
+    # Add background
+    from reportlab.graphics.shapes import Rect
+    bg_rect = Rect(0, 0, 500, 280, fillColor=colors.white, strokeColor=colors.HexColor('#e5e7eb'))
+    drawing.add(bg_rect)
+    
+    # Enhanced pie chart
+    pie = Pie()
+    pie.x = 175
+    pie.y = 90
+    pie.width = 150
+    pie.height = 150
+    
+    # Ensure we have valid data
+    total = healthy + duplicates + inactive + missing_fields + scoring_issues
+    if total == 0:
+        healthy = 1
+        total = 1
+    
+    health_score = (healthy / total * 100) if total > 0 else 100
+    
+    pie.data = [healthy, duplicates, inactive, missing_fields, scoring_issues]
+    pie.labels = [
+        f'Healthy\n{healthy:,}\n({healthy/total*100:.1f}%)',
+        f'Duplicates\n{duplicates:,}\n({duplicates/total*100:.1f}%)',
+        f'Inactive\n{inactive:,}\n({inactive/total*100:.1f}%)',
+        f'Missing Fields\n{missing_fields:,}\n({missing_fields/total*100:.1f}%)',
+        f'Scoring Issues\n{scoring_issues:,}\n({scoring_issues/total*100:.1f}%)'
+    ]
+    
+    pie.slices.strokeWidth = 2
+    pie.slices.strokeColor = colors.white
+    pie.slices[0].fillColor = colors.HexColor('#059669')
+    pie.slices[1].fillColor = colors.HexColor('#dc6803')
+    pie.slices[2].fillColor = colors.HexColor('#dc2626')
+    pie.slices[3].fillColor = colors.HexColor('#7c2d12')
+    pie.slices[4].fillColor = colors.HexColor('#ea580c')
+    
+    # Enhanced styling with dark text for visibility
+    pie.slices.fontName = 'Helvetica-Bold'
+    pie.slices.fontSize = 8
+    pie.slices.fontColor = colors.HexColor('#1f2937')
+    
+    from reportlab.graphics.shapes import String
+    
+    # Enhanced title with background
+    title_bg = Rect(50, 250, 400, 25, fillColor=colors.HexColor('#dc2626'), strokeColor=None)
+    drawing.add(title_bg)
+    
+    title = String(250, 260, 'Prospect Database Health Analysis', textAnchor='middle')
+    title.fontSize = 14
+    title.fontName = 'Helvetica-Bold'
+    title.fillColor = colors.white
+    
+    # Add health score
+    health_text = String(250, 60, f'Database Health Score: {health_score:.1f}% | Total Records: {total:,}', textAnchor='middle')
+    health_text.fontSize = 10
+    health_text.fontName = 'Helvetica-Bold'
+    health_text.fillColor = colors.HexColor('#374151')
+    
+    drawing.add(pie)
+    drawing.add(title)
+    drawing.add(health_text)
+    return drawing
 
 def create_executive_summary_paragraph(email_stats, form_stats, prospect_health, landing_page_stats=None):
     """Create executive summary paragraph with key highlights"""

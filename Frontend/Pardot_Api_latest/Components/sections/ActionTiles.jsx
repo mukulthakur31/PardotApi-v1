@@ -28,6 +28,7 @@ export default function ActionTiles({
   getFormAbandonmentAnalysis,
   getLandingPageStats,
   getProspectHealth,
+  getEngagementPrograms,
   downloadPDF,
   authenticateGoogle,
   exportToSheets,
@@ -212,7 +213,29 @@ export default function ActionTiles({
               🚀 Analyze Pages
             </button>
           </>
-        ) : (
+        ) : activeTab === "engagement" ? (
+          <>
+            <button
+              onClick={getEngagementPrograms}
+              disabled={!token || loading}
+              style={{
+                ...modernButtonStyle,
+                background: "linear-gradient(135deg, #64748b, #475569)",
+                width: "100%"
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
+                e.target.style.transform = "translateY(-2px)";
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
+                e.target.style.transform = "translateY(0)";
+              }}
+            >
+              Get Engagement Programs
+            </button>
+          </>
+        ) : activeTab === "prospects" ? (
           <>
             <button
               onClick={getProspectHealth}
@@ -254,7 +277,7 @@ export default function ActionTiles({
               📝 Download PDF
             </button>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Google Integration */}
@@ -292,6 +315,17 @@ export default function ActionTiles({
             fontStyle: "italic"
           }}>
             Landing page data analysis only
+          </div>
+        ) : activeTab === "engagement" ? (
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            color: "#94a3b8", 
+            fontSize: "1rem",
+            fontStyle: "italic"
+          }}>
+            Engagement programs analysis only
           </div>
         ) : !googleAuth ? (
           <button

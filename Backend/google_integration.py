@@ -14,7 +14,7 @@ class GoogleIntegration:
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        self.redirect_uri = 'http://localhost:4000/google-callback'
+        self.redirect_uri = 'http://localhost:4001/google-callback'
         
     def get_auth_url(self):
         flow = Flow.from_client_config(

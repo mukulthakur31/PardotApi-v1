@@ -20,14 +20,21 @@ from google_integration import GoogleIntegration
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-CORS(app, supports_credentials=True)
+CORS(app, 
+     origins=["http://localhost:5173"], 
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Google Integration
 google_integration = GoogleIntegration(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
 # ===== Authentication Routes =====
-@app.route("/setup", methods=["POST"])
+@app.route("/setup", methods=["POST", "OPTIONS"])
 def setup():
+    if request.method == "OPTIONS":
+        return "", 200
+    
     data = request.json
     required_fields = ['client_id', 'client_secret', 'business_unit_id']
     
@@ -52,6 +59,7 @@ def login():
         auth_url = (
             "https://login.salesforce.com/services/oauth2/authorize"
             f"?response_type=code&client_id={credentials['client_id']}&redirect_uri={REDIRECT_URI}"
+            "&scope=api%20pardot_api%20full%20refresh_token"
         )
         return redirect(auth_url)
     except Exception:
@@ -422,4 +430,4 @@ def google_auth_status():
     return jsonify({"authenticated": bool(session.get('google_credentials'))})
 
 if __name__ == "__main__":
-    app.run(port=4000, debug=True)
+    app.run(port=4001, debug=True)

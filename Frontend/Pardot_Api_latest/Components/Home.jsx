@@ -22,7 +22,7 @@ export default function Home() {
     setMessage('');
 
     try {
-      const response = await fetch('http://localhost:4000/setup', {
+      const response = await fetch('http://localhost:4001/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -38,7 +38,7 @@ export default function Home() {
       if (response.ok) {
         setMessage('Setup successful! Redirecting to login...');
         setTimeout(() => {
-          window.location.href = 'http://localhost:4000/login';
+          window.location.href = 'http://localhost:4001/login';
         }, 2000);
       } else {
         setMessage(`Error: ${result.error}`);
@@ -101,7 +101,7 @@ export default function Home() {
         }}>
           <strong>Setup Instructions:</strong><br/>
           1. Create a Connected App in Salesforce<br/>
-          2. Callback URL: http://localhost:4000/callback<br/>
+          2. Callback URL: http://localhost:4001/callback<br/>
           3. Scopes: pardot_api, full
         </div>
 

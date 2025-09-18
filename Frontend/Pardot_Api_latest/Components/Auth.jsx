@@ -11,7 +11,7 @@ export default function Callback() {
 
     if (code) {
       axios
-        .get(`http://localhost:4000/callback?code=${code}`)
+        .get(`http://localhost:4001/callback?code=${code}`)
         .then((res) => {
           localStorage.setItem("access_token", res.data.access_token);
           navigate("/dashboard");

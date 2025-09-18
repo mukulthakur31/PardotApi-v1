@@ -27,7 +27,7 @@ def fetch_all_prospects(headers):
         params = None  # Clear params for subsequent requests
         
         # Limit to prevent timeout (remove this in production)
-        if len(all_prospects) >= 2000:
+        if len(all_prospects) >= 10000:
             break
     
     return all_prospects

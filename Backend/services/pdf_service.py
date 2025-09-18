@@ -355,8 +355,8 @@ def create_insights_section(stats_list):
     content.append(insights_table)
     return content
 
-def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, landing_page_stats=None):
-    """Generate comprehensive Pardot Audit Report with professional structure"""
+def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, landing_page_stats=None, engagement_programs=None, utm_analysis=None):
+    """Generate comprehensive Pardot Audit Report with professional structure including all available sections"""
     try:
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
@@ -370,10 +370,11 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
         subsection_style = ParagraphStyle('SubSection', parent=styles['Heading3'], fontSize=14, spaceAfter=12, textColor=colors.HexColor('#1f2937'), fontName='Helvetica-Bold')
         body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=11, spaceAfter=12, textColor=colors.HexColor('#374151'), leading=16)
         highlight_style = ParagraphStyle('Highlight', parent=styles['Normal'], fontSize=12, spaceAfter=12, textColor=colors.HexColor('#dc2626'), fontName='Helvetica-Bold', backColor=colors.HexColor('#fef2f2'), borderPadding=8)
+        subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=14, spaceAfter=16, alignment=1, textColor=colors.HexColor('#6b7280'))
         
         # COVER PAGE
         content.append(Spacer(1, 2*inch))
-        content.append(Paragraph("Pardot Audit Report", title_style))
+        content.append(Paragraph("Pardot Comprehensive Audit Report", title_style))
         content.append(Spacer(1, 0.5*inch))
         content.append(Paragraph("[Company Name]", subtitle_style))
         content.append(Spacer(1, 0.3*inch))
@@ -397,7 +398,9 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
             ['Email Campaigns', f"{len(email_stats) if email_stats else 0:,}", '🟢 Active'],
             ['Forms Deployed', f"{len(form_stats) if form_stats else 0:,}", '🟢 Operational'],
             ['Prospect Records', f"{prospect_health.get('total_prospects', 0) if prospect_health else 0:,}", '🟢 Database'],
-            ['Landing Pages', f"{landing_page_stats.get('total_landing_pages', 0) if landing_page_stats else 0:,}", '🟢 Published']
+            ['Landing Pages', f"{landing_page_stats.get('total_landing_pages', 0) if landing_page_stats else 0:,}", '🟢 Published'],
+            ['Engagement Programs', f"{engagement_programs.get('summary', {}).get('total_programs', 0) if engagement_programs else 0:,}", '🟢 Automation'],
+            ['Campaign Tracking Issues', f"{utm_analysis.get('utm_analysis', {}).get('prospects_with_utm_issues', 0) if utm_analysis else 0:,}", '🟡 Monitoring']
         ]
         
         summary_table = Table(summary_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
@@ -703,6 +706,209 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
             ]))
             content.append(landing_table)
         
+        # ENGAGEMENT PROGRAMS ANALYSIS
+        if engagement_programs:
+            content.append(PageBreak())
+            content.append(Paragraph("🎯 ENGAGEMENT PROGRAMS ANALYSIS", section_style))
+            
+            engagement_overview = f"""Analysis of {engagement_programs.get('summary', {}).get('total_programs', 0)} engagement programs reveals 
+            automation workflow performance and optimization opportunities. Engagement programs are critical for nurturing prospects 
+            through the sales funnel with personalized, behavior-triggered communications."""
+            
+            content.append(Paragraph(engagement_overview, body_style))
+            content.append(Spacer(1, 0.2*inch))
+            
+            # Engagement program metrics
+            summary = engagement_programs.get('summary', {})
+            engagement_data = [
+                ['ENGAGEMENT METRIC', 'VALUE', 'STATUS'],
+                ['Total Programs', f"{summary.get('total_programs', 0):,}", '🟢 Deployed'],
+                ['Active Programs', f"{summary.get('active_count', 0):,}", '🟢 Running'],
+                ['Inactive Programs', f"{summary.get('inactive_count', 0):,}", '🟡 Paused/Stopped'],
+                ['Low Completion Programs', f"{summary.get('low_completion_count', 0):,}", '🔴 Needs Review'],
+                ['No Entry Programs', f"{summary.get('no_entry_count', 0):,}", '🟡 Configuration Issue']
+            ]
+            
+            engagement_table = Table(engagement_data, colWidths=[2.5*inch, 1.2*inch, 1.3*inch])
+            engagement_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f3e8ff')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(engagement_table)
+            
+            # Active programs list
+            active_programs = engagement_programs.get('active_programs', [])[:5]
+            if active_programs:
+                content.append(Spacer(1, 0.15*inch))
+                content.append(Paragraph("🟢 Top Active Engagement Programs", subsection_style))
+                
+                for i, program in enumerate(active_programs, 1):
+                    program_text = f"{i}. {program.get('name', 'Unknown')} - Status: {program.get('status', 'Unknown')}"
+                    content.append(Paragraph(program_text, ParagraphStyle('ProgramItem', parent=body_style, fontSize=10, leftIndent=20, spaceAfter=6)))
+        
+        # CAMPAIGN AND UTM ANALYSIS SECTION
+        if utm_analysis:
+            content.append(Spacer(1, 0.3*inch))
+            content.append(Paragraph("📊 CAMPAIGN AND UTM ANALYSIS", section_style))
+            
+            utm_data = utm_analysis.get('utm_analysis', {})
+            utm_overview = f"""Analysis of UTM parameter tracking across {utm_data.get('total_prospects_analyzed', 0):,} prospects 
+            reveals data quality issues affecting campaign attribution and ROI measurement. Proper UTM tracking is essential 
+            for understanding marketing channel effectiveness and optimizing campaign performance."""
+            
+            content.append(Paragraph(utm_overview, body_style))
+            content.append(Spacer(1, 0.2*inch))
+            
+            utm_metrics_data = [
+                ['UTM TRACKING METRIC', 'VALUE', 'STATUS'],
+                ['Total Prospects Analyzed', f"{utm_data.get('total_prospects_analyzed', 0):,}", '🟢 Complete'],
+                ['Prospects with UTM Issues', f"{utm_data.get('prospects_with_utm_issues', 0):,}", 
+                 '🔴 Critical' if utm_data.get('prospects_with_utm_issues', 0) > utm_data.get('total_prospects_analyzed', 1) * 0.3 else '🟡 Moderate'],
+                ['Data Quality Score', f"{((utm_data.get('total_prospects_analyzed', 0) - utm_data.get('prospects_with_utm_issues', 0)) / max(utm_data.get('total_prospects_analyzed', 1), 1) * 100):.1f}%", 
+                 '🟢 Good' if utm_data.get('prospects_with_utm_issues', 0) < utm_data.get('total_prospects_analyzed', 1) * 0.2 else '🟡 Needs Improvement']
+            ]
+            
+            utm_table = Table(utm_metrics_data, colWidths=[2.5*inch, 1.2*inch, 1.3*inch])
+            utm_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f97316')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fed7aa')]),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5)
+            ]))
+            content.append(utm_table)
+            
+            # Campaign and UTM Issues Summary
+            utm_issues = utm_data.get('utm_issues', [])[:3]
+            if utm_issues:
+                content.append(Spacer(1, 0.15*inch))
+                content.append(Paragraph("⚠️ Top Campaign and UTM Tracking Issues", subsection_style))
+                
+                for i, issue in enumerate(utm_issues, 1):
+                    missing_fields = ', '.join(issue.get('missing_fields', []))
+                    invalid_fields = ', '.join(issue.get('invalid_fields', []))
+                    issue_text = f"{i}. Email: {issue.get('email', 'Unknown')}"
+                    if missing_fields:
+                        issue_text += f" - Missing: {missing_fields}"
+                    if invalid_fields:
+                        issue_text += f" - Invalid: {invalid_fields}"
+                    content.append(Paragraph(issue_text, ParagraphStyle('UTMIssue', parent=body_style, fontSize=9, leftIndent=20, spaceAfter=6)))
+        
+        # AUTOMATION WORKFLOW ANALYSIS
+        if engagement_programs:
+            content.append(Spacer(1, 0.3*inch))
+            content.append(Paragraph("🤖 AUTOMATION WORKFLOW INSIGHTS", subsection_style))
+            
+            workflow_insights = [
+                f"• Program Portfolio: {engagement_programs.get('summary', {}).get('total_programs', 0)} total engagement programs deployed",
+                f"• Active Automation: {engagement_programs.get('summary', {}).get('active_count', 0)} programs currently running prospect nurture sequences",
+                f"• Optimization Opportunity: {engagement_programs.get('summary', {}).get('inactive_count', 0)} inactive programs could be reactivated or archived",
+                f"• Performance Review: {engagement_programs.get('summary', {}).get('low_completion_count', 0)} programs show low completion rates requiring content review"
+            ]
+            
+            for insight in workflow_insights:
+                content.append(Paragraph(insight, ParagraphStyle('WorkflowInsight', parent=body_style, fontSize=10, leftIndent=20, spaceAfter=6)))
+        
+        # CAMPAIGN ATTRIBUTION ANALYSIS
+        if utm_analysis:
+            content.append(Spacer(1, 0.2*inch))
+            content.append(Paragraph("📊 CAMPAIGN AND UTM ATTRIBUTION INSIGHTS", subsection_style))
+            
+            utm_data = utm_analysis.get('utm_analysis', {})
+            attribution_insights = [
+                f"• Tracking Coverage: {utm_data.get('total_prospects_analyzed', 0):,} prospects analyzed for UTM parameter completeness",
+                f"• Data Quality Issues: {utm_data.get('prospects_with_utm_issues', 0):,} prospects have incomplete or invalid UTM tracking",
+                f"• Attribution Accuracy: {((utm_data.get('total_prospects_analyzed', 0) - utm_data.get('prospects_with_utm_issues', 0)) / max(utm_data.get('total_prospects_analyzed', 1), 1) * 100):.1f}% of prospects have proper campaign attribution",
+                f"• ROI Impact: UTM tracking issues affect campaign performance measurement and budget allocation decisions"
+            ]
+            
+            for insight in attribution_insights:
+                content.append(Paragraph(insight, ParagraphStyle('AttributionInsight', parent=body_style, fontSize=10, leftIndent=20, spaceAfter=6)))
+        
+        content.append(PageBreak())
+        
+        # COMPREHENSIVE PERFORMANCE SUMMARY
+        content.append(Paragraph("📈 COMPREHENSIVE PERFORMANCE SUMMARY", section_style))
+        
+        # Calculate overall platform health score
+        health_scores = []
+        
+        if email_stats:
+            total_delivered = sum(email.get('stats', {}).get('delivered', 0) for email in email_stats)
+            total_opens = sum(email.get('stats', {}).get('opens', 0) for email in email_stats)
+            email_score = min((total_opens / max(total_delivered, 1) * 100) / 25 * 100, 100)
+            health_scores.append(email_score)
+        
+        if form_stats:
+            total_views = sum(form.get('views', 0) for form in form_stats)
+            total_submissions = sum(form.get('submissions', 0) for form in form_stats)
+            form_score = min((total_submissions / max(total_views, 1) * 100) / 20 * 100, 100)
+            health_scores.append(form_score)
+        
+        if prospect_health:
+            total_prospects = prospect_health.get('total_prospects', 0)
+            issues = (prospect_health.get('duplicates', {}).get('count', 0) + 
+                     prospect_health.get('inactive_prospects', {}).get('count', 0) + 
+                     prospect_health.get('missing_fields', {}).get('count', 0))
+            prospect_score = ((total_prospects - issues) / max(total_prospects, 1) * 100) if total_prospects > 0 else 100
+            health_scores.append(prospect_score)
+        
+        overall_health = sum(health_scores) / len(health_scores) if health_scores else 0
+        
+        performance_summary_data = [
+            ['PLATFORM COMPONENT', 'HEALTH SCORE', 'STATUS', 'PRIORITY'],
+            ['Email Marketing', f"{health_scores[0]:.1f}%" if len(health_scores) > 0 else 'N/A', 
+             '🟢 Excellent' if len(health_scores) > 0 and health_scores[0] >= 80 else '🟡 Good' if len(health_scores) > 0 and health_scores[0] >= 60 else '🔴 Needs Attention', 
+             'Medium' if len(health_scores) > 0 and health_scores[0] >= 60 else 'High'],
+            ['Form Conversion', f"{health_scores[1]:.1f}%" if len(health_scores) > 1 else 'N/A', 
+             '🟢 Excellent' if len(health_scores) > 1 and health_scores[1] >= 80 else '🟡 Good' if len(health_scores) > 1 and health_scores[1] >= 60 else '🔴 Needs Attention', 
+             'Medium' if len(health_scores) > 1 and health_scores[1] >= 60 else 'High'],
+            ['Database Health', f"{health_scores[2]:.1f}%" if len(health_scores) > 2 else 'N/A', 
+             '🟢 Excellent' if len(health_scores) > 2 and health_scores[2] >= 80 else '🟡 Good' if len(health_scores) > 2 and health_scores[2] >= 60 else '🔴 Needs Attention', 
+             'High' if len(health_scores) > 2 and health_scores[2] < 70 else 'Medium'],
+            ['Overall Platform Health', f"{overall_health:.1f}%", 
+             '🟢 Excellent' if overall_health >= 80 else '🟡 Good' if overall_health >= 60 else '🔴 Critical', 
+             'Low' if overall_health >= 80 else 'Medium' if overall_health >= 60 else 'Critical']
+        ]
+        
+        performance_summary_table = Table(performance_summary_data, colWidths=[2*inch, 1*inch, 1.5*inch, 0.5*inch])
+        performance_summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
+        ]))
+        
+        content.append(performance_summary_table)
+        content.append(Spacer(1, 0.3*inch))
+        
+        # Platform health insights
+        health_insights_text = f"""<b>PLATFORM HEALTH ASSESSMENT:</b><br/>
+        Your Pardot platform achieves an overall health score of <b>{overall_health:.1f}%</b>, indicating 
+        {'excellent' if overall_health >= 80 else 'good' if overall_health >= 60 else 'critical'} performance across core marketing automation functions. 
+        {'Continue current optimization efforts while monitoring key metrics.' if overall_health >= 80 else 'Focus on identified improvement areas to enhance platform effectiveness.' if overall_health >= 60 else 'Immediate action required to address critical performance gaps.'}"""
+        
+        content.append(Paragraph(health_insights_text, ParagraphStyle('HealthInsights', parent=body_style, backColor=colors.HexColor('#f0f9ff'), borderPadding=12, borderColor=colors.HexColor('#0ea5e9'), borderWidth=1)))
+        
         content.append(PageBreak())
         
         # ENHANCED RECOMMENDATIONS SECTION
@@ -716,26 +922,29 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
         content.append(Paragraph(rec_overview, body_style))
         content.append(Spacer(1, 0.2*inch))
         
-        # Priority-based recommendations with enhanced styling
+        # Priority-based recommendations with enhanced styling including all sections
         high_priority = [
             "🔴 IMMEDIATE ACTION REQUIRED:",
             "• Email Subject Line A/B Testing: Implement split testing to improve open rates by 15-25%",
             "• Database Duplicate Cleanup: Remove duplicate records affecting campaign accuracy",
-            "• Mobile Email Optimization: Ensure responsive design for 60%+ mobile users"
+            "• Mobile Email Optimization: Ensure responsive design for 60%+ mobile users",
+            "• Campaign and UTM Parameter Standardization: Fix missing/invalid UTM tracking for accurate attribution"
         ]
         
         medium_priority = [
             "🟡 SHORT-TERM IMPROVEMENTS (30-60 days):",
             "• Form Field Optimization: Reduce fields to essential information only",
             "• Landing Page Field Mapping: Fix configuration issues affecting lead capture",
-            "• Re-engagement Campaigns: Target inactive prospects before removal"
+            "• Re-engagement Campaigns: Target inactive prospects before removal",
+            "• Engagement Program Optimization: Review and restart inactive automation workflows"
         ]
         
         long_term = [
             "🟢 LONG-TERM STRATEGY (60+ days):",
             "• Progressive Profiling Implementation: Gather additional data over time",
             "• Advanced Segmentation: Create behavior-based prospect segments",
-            "• Marketing Automation Workflows: Implement nurture campaign sequences"
+            "• Marketing Automation Workflows: Implement nurture campaign sequences",
+            "• Campaign Attribution Modeling: Develop comprehensive campaign and UTM tracking strategy"
         ]
         
         for priority_group in [high_priority, medium_priority, long_term]:
@@ -751,10 +960,10 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
         
         roadmap_data = [
             ['TIMEFRAME', 'ACTION ITEMS', 'EXPECTED IMPACT'],
-            ['Week 1-2', 'Database cleanup, Email A/B testing setup', 'Immediate data quality improvement'],
-            ['Week 3-4', 'Form optimization, Mobile responsiveness audit', '15-25% conversion rate increase'],
-            ['Month 2', 'Landing page fixes, Re-engagement campaigns', 'Improved lead capture accuracy'],
-            ['Month 3+', 'Advanced segmentation, Automation workflows', 'Long-term ROI optimization']
+            ['Week 1-2', 'Database cleanup, Email A/B testing, Campaign/UTM standardization', 'Immediate data quality improvement'],
+            ['Week 3-4', 'Form optimization, Mobile audit, Engagement program review', '15-25% conversion rate increase'],
+            ['Month 2', 'Landing page fixes, Re-engagement campaigns, Campaign/UTM tracking setup', 'Improved lead capture and attribution'],
+            ['Month 3+', 'Advanced segmentation, Automation workflows, Campaign attribution', 'Long-term ROI optimization']
         ]
         
         roadmap_table = Table(roadmap_data, colWidths=[1.2*inch, 2.3*inch, 1.5*inch])
@@ -777,14 +986,71 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
         
         content.append(roadmap_table)
         
-        # Add footer with contact information
+        content.append(PageBreak())
+        
+        # EXECUTIVE ACTION PLAN
+        content.append(Paragraph("🎯 EXECUTIVE ACTION PLAN", section_style))
+        
+        action_plan_overview = """This executive action plan provides a structured approach to implementing the recommendations 
+        outlined in this audit. Each action item includes specific deliverables, success metrics, and resource requirements 
+        to ensure successful execution and measurable results."""
+        
+        content.append(Paragraph(action_plan_overview, body_style))
+        content.append(Spacer(1, 0.2*inch))
+        
+        # Detailed action plan
+        action_plan_data = [
+            ['ACTION ITEM', 'OWNER', 'TIMELINE', 'SUCCESS METRIC', 'RESOURCES'],
+            ['Email A/B Testing Setup', 'Marketing Team', '1-2 weeks', '15% open rate increase', 'Marketing automation platform access'],
+            ['Database Cleanup Project', 'Data Team', '2-4 weeks', '90% data quality score', 'Data management tools, analyst time'],
+            ['Campaign/UTM Standardization', 'Digital Team', '1-3 weeks', '95% tracking coverage', 'Campaign management system access'],
+            ['Form Optimization Review', 'UX/Marketing', '2-3 weeks', '20% conversion increase', 'Analytics tools, design resources'],
+            ['Engagement Program Audit', 'Automation Team', '3-4 weeks', '80% program activation', 'Platform admin access, content review']
+        ]
+        
+        action_plan_table = Table(action_plan_data, colWidths=[1.8*inch, 0.8*inch, 0.8*inch, 1*inch, 1.1*inch])
+        action_plan_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecfdf5')]),
+            ('FONTSIZE', (0, 1), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
+        ]))
+        
+        content.append(action_plan_table)
         content.append(Spacer(1, 0.3*inch))
-        footer_text = """<b>Report Generated by Pardot Analytics Hub</b><br/>
-        For questions about this analysis or implementation support, please contact your marketing automation specialist.<br/>
-        Next recommended audit: 90 days from report generation date."""
         
-        content.append(Paragraph(footer_text, ParagraphStyle('Footer', parent=body_style, fontSize=9, alignment=1, textColor=colors.HexColor('#6b7280'), spaceAfter=20)))
+        # Success measurement framework
+        content.append(Paragraph("📈 SUCCESS MEASUREMENT FRAMEWORK", subsection_style))
         
+        measurement_text = """<b>Key Performance Indicators (KPIs) to Track:</b><br/>
+        • <b>Email Performance:</b> Open rates >25%, Click rates >4%, Bounce rates <2%<br/>
+        • <b>Form Conversion:</b> Overall conversion >20%, Mobile conversion >15%<br/>
+        • <b>Database Health:</b> Duplicate rate <5%, Data completeness >90%<br/>
+        • <b>Campaign Attribution:</b> UTM tracking coverage >95%, Attribution accuracy >90%<br/>
+        • <b>Automation Efficiency:</b> Program completion rates >70%, Lead nurturing effectiveness >60%<br/><br/>
+        <b>Reporting Schedule:</b> Weekly tactical reviews, Monthly strategic assessments, Quarterly comprehensive audits"""
+        
+        content.append(Paragraph(measurement_text, ParagraphStyle('Measurement', parent=body_style, backColor=colors.HexColor('#fef7ff'), borderPadding=12, borderColor=colors.HexColor('#a855f7'), borderWidth=1)))
+        
+        # Add footer with contact information
+        content.append(Spacer(1, 0.4*inch))
+        footer_text = """<b>Pardot Comprehensive Audit Report</b><br/>
+        Generated by Advanced Marketing Analytics Platform<br/>
+        For implementation support and questions, contact your marketing automation specialist.<br/>
+        <i>Next recommended comprehensive audit: 90 days from report generation date.</i><br/>
+        Report includes: Email Performance, Form Analytics, Prospect Health, Landing Pages, Engagement Programs, Campaign and UTM Tracking"""
+        
+        content.append(Paragraph(footer_text, ParagraphStyle('Footer', parent=body_style, fontSize=8, alignment=1, textColor=colors.HexColor('#6b7280'), spaceAfter=20)))
+        
+        # Build the document
         doc.build(content)
         buffer.seek(0)
         return buffer
@@ -792,7 +1058,22 @@ def create_comprehensive_summary_pdf(email_stats, form_stats, prospect_health, l
         print(f"Error in create_comprehensive_summary_pdf: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise e
+        # Return a basic error PDF instead of failing completely
+        try:
+            error_buffer = BytesIO()
+            error_doc = SimpleDocTemplate(error_buffer, pagesize=A4)
+            error_content = [
+                Paragraph("Pardot Audit Report - Generation Error", getSampleStyleSheet()['Title']),
+                Spacer(1, 0.5*inch),
+                Paragraph(f"An error occurred while generating the comprehensive report: {str(e)}", getSampleStyleSheet()['Normal']),
+                Spacer(1, 0.3*inch),
+                Paragraph("Please contact support for assistance.", getSampleStyleSheet()['Normal'])
+            ]
+            error_doc.build(error_content)
+            error_buffer.seek(0)
+            return error_buffer
+        except:
+            raise e
 
 def create_enhanced_email_chart(sent, delivered, opens, clicks):
     """Create enhanced email performance chart with better design"""

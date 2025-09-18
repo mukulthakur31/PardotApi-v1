@@ -5,6 +5,7 @@ import FormsSection from "./sections/FormsSection";
 import LandingPagesSection from "./sections/LandingPagesSection";
 import ProspectsSection from "./sections/ProspectsSection";
 import EngagementSection from "./sections/EngagementSection";
+import UTMSection from "./sections/UTMSection";
 import StatusCards from "./sections/StatusCards";
 import DateFilters from "./sections/DateFilters";
 import ActionTiles from "./sections/ActionTiles";
@@ -50,6 +51,10 @@ const styles = `
   0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
   50% { box-shadow: 0 0 30px rgba(99, 102, 241, 0.5); }
 }
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
 `;
 
 // Inject styles
@@ -68,6 +73,7 @@ export default function Dashboard() {
 
 
   const [token, setToken] = useState("");
+  const [pardotConnected, setPardotConnected] = useState(false);
   const [googleAuth, setGoogleAuth] = useState(false);
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,6 +90,12 @@ export default function Dashboard() {
   
   // Engagement states
   const [engagementAnalysis, setEngagementAnalysis] = useState(null);
+  
+  // UTM states
+  const [utmAnalysis, setUtmAnalysis] = useState(null);
+  
+  // Campaign engagement states
+  const [campaignEngagement, setCampaignEngagement] = useState(null);
 
   const [day, setDay] = useState("");
   const [month, setMonth] = useState("");
@@ -97,10 +109,60 @@ export default function Dashboard() {
       setGoogleAuth(true);
     }
 
-    // Get token securely from session
+    // Get token and validate it
     getTokenFromSession();
     checkGoogleAuthStatus();
-  }, []);
+
+    // Listen for custom events from UTM section buttons
+    const handleAnalyzeUTM = () => {
+      if (token) {
+        getUTMAnalysis();
+      }
+    };
+
+    const handleAnalyzeCampaigns = () => {
+      if (token) {
+        getCampaignEngagementAnalysis();
+      }
+    };
+
+    window.addEventListener('analyzeUTM', handleAnalyzeUTM);
+    window.addEventListener('analyzeCampaigns', handleAnalyzeCampaigns);
+
+    return () => {
+      window.removeEventListener('analyzeUTM', handleAnalyzeUTM);
+      window.removeEventListener('analyzeCampaigns', handleAnalyzeCampaigns);
+    };
+  }, [token]);
+
+  const validateToken = async () => {
+    try {
+      const response = await axios.get("http://localhost:4000/validate-token", {
+        headers: { Authorization: token }
+      });
+
+      if (response.data.valid) {
+        setPardotConnected(true);
+      } else {
+        setPardotConnected(false);
+        setToken("");
+        window.location.href = "/";
+      }
+    } catch (error) {
+      setPardotConnected(false);
+      setToken("");
+      if (error.response?.status === 401) {
+        window.location.href = "/";
+      }
+    }
+  };
+
+  // Validate token when it changes
+  useEffect(() => {
+    if (token) {
+      validateToken();
+    }
+  }, [token]);
 
 
 
@@ -283,6 +345,32 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   };
 
+  const getUTMAnalysis = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-utm-analysis", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setUtmAnalysis(res.data);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
+  const getCampaignEngagementAnalysis = () => {
+    setLoading(true);
+    axios
+      .get("http://localhost:4000/get-campaign-engagement-analysis", {
+        headers: { Authorization: token }
+      })
+      .then((res) => {
+        setCampaignEngagement(res.data);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  };
+
 
 
 
@@ -375,6 +463,13 @@ export default function Dashboard() {
       alert("Please get form stats first");
       return;
     }
+    if (activeTab === "utm" && (!utmAnalysis?.utm_analysis?.export_data?.length && !campaignEngagement?.campaign_engagement_analysis)) {
+      alert("Please run UTM or Campaign analysis first");
+      return;
+    }
+    
+    console.log('UTM Analysis:', utmAnalysis);
+    console.log('Campaign Engagement:', campaignEngagement);
 
     setLoading(true);
     try {
@@ -392,8 +487,65 @@ export default function Dashboard() {
           data_type: "forms",
           data: formStats
         };
+      } else if (activeTab === "utm") {
+        if (utmAnalysis?.utm_analysis?.export_data?.length) {
+          exportData = {
+            title: `UTM Issues Analysis ${new Date().getFullYear()}`,
+            data_type: "utm",
+            data: utmAnalysis.utm_analysis.export_data
+          };
+        } else if (campaignEngagement?.campaign_engagement_analysis) {
+          const campaignData = [];
+          const analysis = campaignEngagement.campaign_engagement_analysis;
+          
+          console.log('Processing campaign data:', analysis);
+          
+          // Add active campaigns
+          if (analysis.active_campaigns && analysis.active_campaigns.length > 0) {
+            analysis.active_campaigns.forEach(campaign => {
+              campaignData.push({
+                "Campaign ID": campaign.id,
+                "Campaign Name": campaign.name,
+                "Status": "Active",
+                "Created Date": campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : 'N/A',
+                "Engagement Score": campaign.engagement_score || 0
+              });
+            });
+          }
+          
+          // Add inactive campaigns
+          if (analysis.inactive_campaigns && analysis.inactive_campaigns.length > 0) {
+            analysis.inactive_campaigns.forEach(campaign => {
+              campaignData.push({
+                "Campaign ID": campaign.id,
+                "Campaign Name": campaign.name,
+                "Status": "Inactive",
+                "Created Date": campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : 'N/A',
+                "Engagement Score": campaign.engagement_score || 0
+              });
+            });
+          }
+          
+          console.log('Campaign data to export:', campaignData);
+          
+          if (campaignData.length === 0) {
+            alert('No campaign data available to export');
+            return;
+          }
+          
+          exportData = {
+            title: `Campaign Engagement Analysis ${new Date().getFullYear()}`,
+            data_type: "campaigns",
+            data: campaignData
+          };
+        } else {
+          alert('No data available to export. Please run an analysis first.');
+          return;
+        }
       }
 
+      console.log('Exporting data:', exportData);
+      
       const response = await axios.post(
         "http://localhost:4000/export-to-sheets",
         exportData,
@@ -442,159 +594,271 @@ export default function Dashboard() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      padding: "20px"
+      background: "linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%)",
+      fontFamily: "'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif",
+      display: "flex",
+      flexDirection: "column"
     }}>
-      {/* Header */}
-      <div style={{
-        textAlign: "center",
-        marginBottom: "40px",
-        color: "#fff",
-        position: "relative"
-      }}>
-        <h1 style={{
-          fontSize: "3.5rem",
-          fontWeight: "800",
-          marginBottom: "12px",
-          background: "linear-gradient(135deg, #3b82f6, #1e40af)",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          animation: "fadeInUp 1s ease-out"
-        }}>Analytics Hub</h1>
-        <p style={{ 
-          fontSize: "1.25rem", 
-          color: "#cbd5e1",
-          animation: "fadeInUp 1.2s ease-out"
-        }}>Pardot Marketing Intelligence Platform</p>
-        
-        {/* Comprehensive Report Button */}
-        <button
-          onClick={downloadComprehensivePDF}
-          disabled={!token || pdfLoading}
-          style={{
-            position: "absolute",
-            top: "0",
-            right: "0",
-            padding: "12px 24px",
-            borderRadius: "12px",
-            border: "none",
-            background: pdfLoading 
-              ? "linear-gradient(135deg, #64748b, #475569)" 
-              : "linear-gradient(135deg, #059669, #047857)",
-            color: "#ffffff",
-            cursor: pdfLoading ? "not-allowed" : "pointer",
-            fontWeight: "600",
-            fontSize: "0.95rem",
-            transition: "all 0.3s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            boxShadow: "0 4px 15px rgba(0, 0, 0, 0.2)"
-          }}
-          onMouseOver={(e) => {
-            if (!pdfLoading) {
-              e.target.style.background = "linear-gradient(135deg, #047857, #065f46)";
-              e.target.style.transform = "translateY(-2px)";
-            }
-          }}
-          onMouseOut={(e) => {
-            if (!pdfLoading) {
-              e.target.style.background = "linear-gradient(135deg, #059669, #047857)";
-              e.target.style.transform = "translateY(0)";
-            }
-          }}
-        >
-          {pdfLoading ? (
-            <>
-              <div style={{
-                width: "16px",
-                height: "16px",
-                border: "2px solid #ffffff",
-                borderTop: "2px solid transparent",
-                borderRadius: "50%",
-                animation: "spin 1s linear infinite"
-              }}></div>
-              Generating...
-            </>
-          ) : (
-            <>
-              📄 Full Report
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Status Cards */}
-      <StatusCards token={token} googleAuth={googleAuth} />
-
-      {/* Tab Navigation */}
+      {/* Top Header Bar */}
       <div style={{
         display: "flex",
-        justifyContent: "center",
-        marginBottom: "32px",
-        background: "rgba(30, 41, 59, 0.6)",
-        borderRadius: "16px",
-        padding: "8px",
-        maxWidth: "600px",
-        margin: "0 auto 32px auto",
-        border: "1px solid rgba(255, 255, 255, 0.05)"
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "20px 40px",
+        background: "rgba(15, 23, 42, 0.9)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        position: "sticky",
+        top: 0,
+        zIndex: 100
       }}>
-        {[
-          { id: "emails", label: "📧 Emails" },
-          { id: "forms", label: "📝 Forms" },
-          { id: "prospects", label: "👥 Prospects" },
-          { id: "landing-pages", label: "🚀 Landing Pages" },
-          { id: "engagement", label: "🎯 Engagement" }
-        ].map((tab) => (
+        {/* Analytics Hub - Top Left */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
+        }}>
+          <div style={{
+            width: "40px",
+            height: "40px",
+            background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            borderRadius: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "20px",
+            animation: "glow 2s ease-in-out infinite alternate"
+          }}>📊</div>
+          <div>
+            <h1 style={{
+              fontSize: "2.2rem",
+              fontWeight: "700",
+              letterSpacing: "-0.025em",
+              margin: 0,
+              background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              animation: "fadeInUp 1s ease-out"
+            }}>Analytics Hub</h1>
+            <p style={{ 
+              fontSize: "0.9rem", 
+              color: "#94a3b8",
+              fontWeight: "500",
+              letterSpacing: "0.025em",
+              margin: 0,
+              fontWeight: "500"
+            }}>Pardot Intelligence</p>
+          </div>
+        </div>
+
+        {/* Connection Status - Top Right */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
+        }}>
+          {/* Pardot Status */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            background: pardotConnected 
+              ? "rgba(34, 197, 94, 0.1)" 
+              : "rgba(239, 68, 68, 0.1)",
+            border: `1px solid ${pardotConnected ? "#22c55e" : "#ef4444"}`,
+            fontSize: "0.8rem",
+            fontWeight: "600",
+            color: pardotConnected ? "#22c55e" : "#ef4444",
+            animation: "pulse 2s ease-in-out infinite"
+          }}>
+            <div style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: pardotConnected ? "#22c55e" : "#ef4444",
+              animation: "pulse 1s ease-in-out infinite"
+            }}></div>
+            Pardot
+          </div>
+
+          {/* Google Status */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            background: googleAuth 
+              ? "rgba(34, 197, 94, 0.1)" 
+              : "rgba(239, 68, 68, 0.1)",
+            border: `1px solid ${googleAuth ? "#22c55e" : "#ef4444"}`,
+            fontSize: "0.8rem",
+            fontWeight: "600",
+            color: googleAuth ? "#22c55e" : "#ef4444",
+            animation: "pulse 2s ease-in-out infinite"
+          }}>
+            <div style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: googleAuth ? "#22c55e" : "#ef4444",
+              animation: "pulse 1s ease-in-out infinite"
+            }}></div>
+            Google
+          </div>
+
+          {/* Full Report Button */}
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={downloadComprehensivePDF}
+            disabled={!token || pdfLoading}
             style={{
-              padding: "12px 24px",
-              borderRadius: "12px",
+              padding: "8px 16px",
+              borderRadius: "10px",
               border: "none",
-              background: activeTab === tab.id 
-                ? "linear-gradient(135deg, #3b82f6, #1e40af)" 
-                : "transparent",
-              color: activeTab === tab.id ? "#ffffff" : "#cbd5e1",
-              cursor: "pointer",
+              background: pdfLoading 
+                ? "linear-gradient(135deg, #64748b, #475569)" 
+                : "linear-gradient(135deg, #059669, #047857)",
+              color: "#ffffff",
+              cursor: pdfLoading ? "not-allowed" : "pointer",
               fontWeight: "600",
-              fontSize: "0.95rem",
+              fontSize: "0.8rem",
               transition: "all 0.3s ease",
-              margin: "0 4px"
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 4px 15px rgba(0, 0, 0, 0.2)"
             }}
             onMouseOver={(e) => {
-              if (activeTab !== tab.id) {
-                e.target.style.background = "rgba(59, 130, 246, 0.1)";
-                e.target.style.color = "#f1f5f9";
+              if (!pdfLoading) {
+                e.target.style.background = "linear-gradient(135deg, #047857, #065f46)";
+                e.target.style.transform = "translateY(-1px)";
               }
             }}
             onMouseOut={(e) => {
-              if (activeTab !== tab.id) {
-                e.target.style.background = "transparent";
-                e.target.style.color = "#cbd5e1";
+              if (!pdfLoading) {
+                e.target.style.background = "linear-gradient(135deg, #059669, #047857)";
+                e.target.style.transform = "translateY(0)";
               }
             }}
           >
-            {tab.label}
+            {pdfLoading ? (
+              <>
+                <div style={{
+                  width: "12px",
+                  height: "12px",
+                  border: "2px solid #ffffff",
+                  borderTop: "2px solid transparent",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite"
+                }}></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                📄 Report
+              </>
+            )}
           </button>
-        ))}
+        </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div style={{
-        background: "rgba(15, 23, 42, 0.8)",
-        backdropFilter: "blur(20px)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        borderRadius: "20px",
-        padding: "48px",
-        maxWidth: "1400px",
-        margin: "0 auto",
-        color: "#fff",
-        boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
-        animation: "fadeIn 1.2s ease-out"
+        flex: 1,
+        display: "flex",
+        padding: "20px",
+        gap: "20px"
       }}>
+        {/* Sidebar Navigation */}
+        <div style={{
+          width: "280px",
+          background: "rgba(15, 23, 42, 0.8)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          borderRadius: "20px",
+          padding: "24px",
+          height: "fit-content",
+          position: "sticky",
+          top: "120px"
+        }}>
+          <h3 style={{
+            color: "#f8fafc",
+            fontSize: "1.25rem",
+            fontWeight: "600",
+            letterSpacing: "-0.025em",
+            marginBottom: "20px",
+            textAlign: "center"
+          }}>Modules</h3>
+          
+          <div style={{
+            display: "grid",
+            gap: "12px"
+          }}>
+            {[
+              { id: "emails", label: "📧 Email Campaigns", color: "linear-gradient(135deg, #6366f1, #4f46e5)" },
+              { id: "forms", label: "📝 Forms Analysis", color: "linear-gradient(135deg, #10b981, #059669)" },
+              { id: "prospects", label: "👥 Prospect Health", color: "linear-gradient(135deg, #f59e0b, #d97706)" },
+              { id: "landing-pages", label: "🚀 Landing Pages", color: "linear-gradient(135deg, #8b5cf6, #7c3aed)" },
+              { id: "engagement", label: "🎯 Engagement", color: "linear-gradient(135deg, #ef4444, #dc2626)" },
+              { id: "utm", label: "📊 Campaign & UTM Analysis", color: "linear-gradient(135deg, #06b6d4, #0891b2)" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: "16px 20px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: activeTab === tab.id 
+                    ? tab.color
+                    : "rgba(30, 41, 59, 0.4)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  fontSize: "0.95rem",
+                  letterSpacing: "0.025em",
+                  transition: "all 0.3s ease",
+                  textAlign: "left",
+                  width: "100%",
+                  boxShadow: activeTab === tab.id 
+                    ? "0 8px 25px rgba(0, 0, 0, 0.3)" 
+                    : "0 2px 10px rgba(0, 0, 0, 0.1)",
+                  transform: activeTab === tab.id ? "translateY(-2px)" : "translateY(0)"
+                }}
+                onMouseOver={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.target.style.background = "rgba(59, 130, 246, 0.2)";
+                    e.target.style.transform = "translateY(-1px)";
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.target.style.background = "rgba(30, 41, 59, 0.4)";
+                    e.target.style.transform = "translateY(0)";
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div style={{
+          flex: 1,
+          background: "rgba(15, 23, 42, 0.8)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          borderRadius: "20px",
+          padding: "32px",
+          color: "#fff",
+          boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
+          animation: "fadeIn 1.2s ease-out",
+          overflow: "auto"
+        }}>
         {/* Date Filters - Only for emails */}
         {activeTab === "emails" && (
           <DateFilters 
@@ -616,6 +880,7 @@ export default function Dashboard() {
           stats={stats}
           formStats={formStats}
           prospectHealth={prospectHealth}
+          utmAnalysis={utmAnalysis}
           spreadsheetId={spreadsheetId}
           getEmailStats={getEmailStats}
           getFormStats={getFormStats}
@@ -623,11 +888,13 @@ export default function Dashboard() {
           getFormAbandonmentAnalysis={getFormAbandonmentAnalysis}
           getLandingPageStats={getLandingPageStats}
           getProspectHealth={getProspectHealth}
+          campaignEngagement={campaignEngagement}
           getEngagementPrograms={getEngagementAnalysis}
+          getUTMAnalysis={getUTMAnalysis}
+          getCampaignEngagementAnalysis={getCampaignEngagementAnalysis}
           downloadPDF={downloadPDF}
           authenticateGoogle={authenticateGoogle}
           exportToSheets={exportToSheets}
-          exportToDrive={exportToDrive}
         />
 
 
@@ -695,6 +962,14 @@ export default function Dashboard() {
             getEngagementAnalysis={getEngagementAnalysis}
           />
         )}
+        
+        {activeTab === "utm" && (
+          <UTMSection 
+            utmAnalysis={utmAnalysis}
+            campaignEngagement={campaignEngagement}
+          />
+        )}
+        </div>
       </div>
     </div>
   );

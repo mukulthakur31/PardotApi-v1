@@ -21,7 +21,8 @@ export default function ActionTiles({
   stats,
   formStats,
   prospectHealth,
-  spreadsheetId,
+  utmAnalysis,
+  campaignEngagement,
   getEmailStats,
   getFormStats,
   getActiveInactiveForms,
@@ -29,18 +30,19 @@ export default function ActionTiles({
   getLandingPageStats,
   getProspectHealth,
   getEngagementPrograms,
+  getUTMAnalysis,
+  getCampaignEngagementAnalysis,
   downloadPDF,
   authenticateGoogle,
-  exportToSheets,
-  exportToDrive
+  exportToSheets
 }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+      gridTemplateColumns: "1fr 1fr",
       gap: "24px",
       marginBottom: "48px",
-      maxWidth: "1400px",
+      maxWidth: "800px",
       margin: "0 auto 48px auto"
     }}>
       {/* Data Actions */}
@@ -68,14 +70,6 @@ export default function ActionTiles({
                 marginBottom: "16px",
                 width: "100%"
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
-              }}
             >
               Get Email Stats
             </button>
@@ -86,14 +80,6 @@ export default function ActionTiles({
                 ...modernButtonStyle,
                 background: "linear-gradient(135deg, #94a3b8, #64748b)",
                 width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #94a3b8, #64748b)";
-                e.target.style.transform = "translateY(0)";
               }}
             >
               📝 Download PDF
@@ -111,14 +97,6 @@ export default function ActionTiles({
                 width: "100%",
                 fontSize: "0.9rem"
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
-              }}
             >
               📊 Basic Stats
             </button>
@@ -132,14 +110,6 @@ export default function ActionTiles({
                 width: "100%",
                 fontSize: "0.85rem",
                 padding: "10px 20px"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #047857, #065f46)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #059669, #047857)";
-                e.target.style.transform = "translateY(0)";
               }}
             >
               🔄 Active/Inactive
@@ -155,18 +125,9 @@ export default function ActionTiles({
                 fontSize: "0.85rem",
                 padding: "10px 20px"
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #b91c1c, #991b1b)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #dc2626, #b91c1c)";
-                e.target.style.transform = "translateY(0)";
-              }}
             >
               ⚠️ Abandonment
             </button>
-
             <button
               onClick={downloadPDF}
               disabled={!token || loading || formStats.length === 0}
@@ -177,62 +138,60 @@ export default function ActionTiles({
                 fontSize: "0.85rem",
                 padding: "10px 20px"
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #4f46e5, #4338ca)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
-                e.target.style.transform = "translateY(0)";
-              }}
             >
               📝 Download PDF
             </button>
           </>
-
         ) : activeTab === "landing-pages" ? (
-          <>
-            <button
-              onClick={getLandingPageStats}
-              disabled={!token || loading}
-              style={{
-                ...modernButtonStyle,
-                background: "linear-gradient(135deg, #64748b, #475569)",
-                marginBottom: "16px",
-                width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
-              }}
-            >
-              🚀 Analyze Pages
-            </button>
-          </>
+          <button
+            onClick={getLandingPageStats}
+            disabled={!token || loading}
+            style={{
+              ...modernButtonStyle,
+              background: "linear-gradient(135deg, #64748b, #475569)",
+              width: "100%"
+            }}
+          >
+            🚀 Analyze Pages
+          </button>
         ) : activeTab === "engagement" ? (
+          <button
+            onClick={getEngagementPrograms}
+            disabled={!token || loading}
+            style={{
+              ...modernButtonStyle,
+              background: "linear-gradient(135deg, #64748b, #475569)",
+              width: "100%"
+            }}
+          >
+            Get Engagement Programs
+          </button>
+        ) : activeTab === "utm" ? (
           <>
             <button
-              onClick={getEngagementPrograms}
+              onClick={getUTMAnalysis}
               disabled={!token || loading}
               style={{
                 ...modernButtonStyle,
-                background: "linear-gradient(135deg, #64748b, #475569)",
-                width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
+                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                marginBottom: "12px",
+                width: "100%",
+                fontSize: "0.9rem"
               }}
             >
-              Get Engagement Programs
+              🎯 Analyze UTM Parameters
+            </button>
+            <button
+              onClick={getCampaignEngagementAnalysis}
+              disabled={!token || loading}
+              style={{
+                ...modernButtonStyle,
+                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                width: "100%",
+                fontSize: "0.9rem"
+              }}
+            >
+              📈 Analyze Campaign Engagement
             </button>
           </>
         ) : activeTab === "prospects" ? (
@@ -246,14 +205,6 @@ export default function ActionTiles({
                 marginBottom: "16px",
                 width: "100%"
               }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
-              }}
             >
               Analyze Database
             </button>
@@ -264,14 +215,6 @@ export default function ActionTiles({
                 ...modernButtonStyle,
                 background: "linear-gradient(135deg, #64748b, #475569)",
                 width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-                e.target.style.transform = "translateY(0)";
               }}
             >
               📝 Download PDF
@@ -294,40 +237,7 @@ export default function ActionTiles({
         boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)"
       }}>
         <h4 style={{ marginBottom: "24px", fontSize: "1.3rem", fontWeight: "700", color: "#f1f5f9" }}>Google Workspace</h4>
-        {activeTab === "prospects" ? (
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            color: "#94a3b8", 
-            fontSize: "1rem",
-            fontStyle: "italic"
-          }}>
-            Use PDF download for prospects data
-          </div>
-        ) : activeTab === "landing-pages" ? (
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            color: "#94a3b8", 
-            fontSize: "1rem",
-            fontStyle: "italic"
-          }}>
-            Landing page data analysis only
-          </div>
-        ) : activeTab === "engagement" ? (
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            color: "#94a3b8", 
-            fontSize: "1rem",
-            fontStyle: "italic"
-          }}>
-            Engagement programs analysis only
-          </div>
-        ) : !googleAuth ? (
+        {!googleAuth ? (
           <button
             onClick={authenticateGoogle}
             disabled={loading}
@@ -336,62 +246,21 @@ export default function ActionTiles({
               background: "linear-gradient(135deg, #64748b, #475569)",
               width: "100%"
             }}
-            onMouseOver={(e) => {
-              e.target.style.background = "linear-gradient(135deg, #475569, #334155)";
-              e.target.style.transform = "translateY(-2px)";
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = "linear-gradient(135deg, #64748b, #475569)";
-              e.target.style.transform = "translateY(0)";
-            }}
           >
             Connect Google
           </button>
         ) : (
-          <>
-            <button
-              onClick={exportToSheets}
-              disabled={!token || loading || 
-                (activeTab === "emails" && stats.length === 0) ||
-                (activeTab === "forms" && formStats.length === 0)
-              }
-              style={{
-                ...modernButtonStyle,
-                background: "linear-gradient(135deg, #059669, #047857)",
-                marginBottom: "16px",
-                width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #047857, #065f46)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #059669, #047857)";
-                e.target.style.transform = "translateY(0)";
-              }}
-            >
-              Export to Sheets
-            </button>
-            <button
-              onClick={exportToDrive}
-              disabled={!spreadsheetId || loading}
-              style={{
-                ...modernButtonStyle,
-                background: "linear-gradient(135deg, #dc2626, #b91c1c)",
-                width: "100%"
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #b91c1c, #991b1b)";
-                e.target.style.transform = "translateY(-2px)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = "linear-gradient(135deg, #dc2626, #b91c1c)";
-                e.target.style.transform = "translateY(0)";
-              }}
-            >
-              Export to Drive
-            </button>
-          </>
+          <button
+            onClick={exportToSheets}
+            disabled={!token || loading}
+            style={{
+              ...modernButtonStyle,
+              background: "linear-gradient(135deg, #059669, #047857)",
+              width: "100%"
+            }}
+          >
+            📊 Export to Sheets
+          </button>
         )}
       </div>
     </div>

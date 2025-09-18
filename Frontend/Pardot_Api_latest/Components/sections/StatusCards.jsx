@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function StatusCards({ token, googleAuth }) {
+export default function StatusCards({ token, pardotConnected, googleAuth }) {
   return (
     <div style={{
       display: "flex",
@@ -25,16 +25,16 @@ export default function StatusCards({ token, googleAuth }) {
           width: "12px",
           height: "12px",
           borderRadius: "50%",
-          backgroundColor: token ? "#22c55e" : "#ef4444",
+          backgroundColor: pardotConnected ? "#22c55e" : "#ef4444",
           marginBottom: "16px"
         }}></div>
         <div style={{ fontWeight: "700", marginBottom: "8px", fontSize: "1.1rem" }}>Pardot Status</div>
         <div style={{ 
-          color: token ? "#22c55e" : "#ef4444",
+          color: pardotConnected ? "#22c55e" : "#ef4444",
           fontWeight: "600",
           fontSize: "1rem"
         }}>
-          {token ? "Connected" : "Disconnected"}
+          {pardotConnected ? "Connected" : "Disconnected"}
         </div>
       </div>
       

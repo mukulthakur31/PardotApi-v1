@@ -109,6 +109,38 @@ class GoogleIntegration:
                     ]
                     values.append(row)
             
+            # Check if it's UTM data (list of dictionaries with UTM fields)
+            elif isinstance(data, list) and len(data) > 0 and 'Prospect ID' in data[0]:
+                # UTM data - already formatted for export
+                if data:
+                    headers = list(data[0].keys())
+                    values = [headers]
+                    
+                    for item in data:
+                        row = [item.get(header, '') for header in headers]
+                        values.append(row)
+            
+            # Check if it's campaign data (list of dictionaries with Campaign ID)
+            elif isinstance(data, list) and len(data) > 0 and 'Campaign ID' in data[0]:
+                # Campaign data - already formatted for export
+                if data:
+                    headers = list(data[0].keys())
+                    values = [headers]
+                    
+                    for item in data:
+                        row = [item.get(header, '') for header in headers]
+                        values.append(row)
+            
+            # Generic data export (fallback)
+            elif isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                # Generic dictionary data
+                headers = list(data[0].keys())
+                values = [headers]
+                
+                for item in data:
+                    row = [item.get(header, '') for header in headers]
+                    values.append(row)
+            
             # Check if it's prospect health data (has 'total_prospects' key)
             elif isinstance(data, dict) and 'total_prospects' in data:
                 # Prospect health data

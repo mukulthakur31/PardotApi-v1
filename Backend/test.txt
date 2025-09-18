@@ -1,0 +1,67 @@
+Build me a Python script that uses the Pardot v5 Export API to audit UTM parameters for prospects. The script should do the following:
+
+Create an Export Job
+
+Use POST /api/v5/exports
+
+Export the following fields:
+
+id
+
+email
+
+utm_source__c
+
+utm_medium__c
+
+utm_campaign__c
+
+Apply a procedure to fetch all prospects created after 2024-01-01T00:00:00-00:00.
+
+Return the export job ID.
+
+Poll the Export Status
+
+Use GET /api/v5/exports/{id} in a loop until the status is "Complete".
+
+If "Failed" or "Canceled", stop and raise an error.
+
+Download Export Results
+
+When complete, get the resultRefs from the export metadata.
+
+For each result, call GET /api/v5/exports/{id}/results?fileId=<fileId> and download the CSV data.
+
+Analyze UTM Parameters
+
+Parse the CSV file(s).
+
+For each prospect, check if any of the UTM fields (utm_source__c, utm_medium__c, utm_campaign__c) are missing (empty) or invalid.
+
+Define allowed values:
+
+utm_source__c: google, linkedin, facebook
+
+utm_medium__c: cpc, email, social
+
+utm_campaign__c: spring_sale, newsletter, webinar
+
+A field is missing if blank.
+
+A field is invalid if not in the allowed list.
+
+Output Report
+
+Generate a JSON report that lists all prospects with missing or invalid UTM fields.
+
+Each record should include:
+
+prospect_id
+
+email
+
+missing_fields (array)
+
+invalid_fields (array)
+
+Also, save the report into a CSV file named utm_audit_report.csv.

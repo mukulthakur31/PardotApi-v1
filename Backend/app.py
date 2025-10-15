@@ -25,18 +25,23 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
 # Security: Configure CORS properly for production
+
 CORS(app, 
+     origins=["http://localhost:5173"], 
      supports_credentials=True,
-     origins=["http://localhost:5173"],  # Only allow frontend origin
-     methods=["GET", "POST"],
-     allow_headers=["Content-Type", "Authorization"])
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 
 # Google Integration
 google_integration = GoogleIntegration(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
 # ===== Authentication Routes =====
-@app.route("/setup", methods=["POST"])
+@app.route("/setup", methods=["POST", "OPTIONS"])
 def setup():
+    if request.method == "OPTIONS":
+        return "", 200
+    
     data = request.json
     required_fields = ['client_id', 'client_secret', 'business_unit_id']
     
@@ -61,6 +66,7 @@ def login():
         auth_url = (
             "https://login.salesforce.com/services/oauth2/authorize"
             f"?response_type=code&client_id={credentials['client_id']}&redirect_uri={REDIRECT_URI}"
+            "&scope=api%20pardot_api%20full%20refresh_token"
         )
         return redirect(auth_url)
     except Exception:
@@ -532,4 +538,8 @@ def get_campaign_engagement_analysis_route():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
+
     app.run(port=4001, debug=True, host='127.0.0.1')
+
+#     app.run(port=4001, debug=True)
+# >>>>>>> landing_pages

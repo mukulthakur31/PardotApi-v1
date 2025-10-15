@@ -105,6 +105,8 @@ def get_token():
     access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "No access token found"}), 401
+    
+    print(access_token)
     return jsonify({"token": access_token})
 
 @app.route("/validate-token", methods=["GET"])
@@ -530,7 +532,4 @@ def get_campaign_engagement_analysis_route():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Security: Disable debug mode in production
-    import os
-    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(port=4001, debug=debug_mode, host='127.0.0.1')
+    app.run(port=4001, debug=True, host='127.0.0.1')

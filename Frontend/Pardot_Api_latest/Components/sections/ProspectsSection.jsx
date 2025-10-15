@@ -7,11 +7,9 @@ export default function ProspectsSection({
   inactiveProspects,
   duplicateProspects,
   missingFieldsProspects,
-  scoringIssuesProspects,
   getDuplicateProspects,
   getInactiveProspects,
-  getMissingFieldsProspects,
-  getScoringIssuesProspects
+  getMissingFieldsProspects
 }) {
   if (!prospectHealth) return null;
 
@@ -56,7 +54,7 @@ export default function ProspectsSection({
       {/* Health Summary Cards */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gridTemplateColumns: "repeat(3, 1fr)",
         gap: "20px",
         marginBottom: "32px"
       }}>
@@ -192,69 +190,7 @@ export default function ProspectsSection({
           </div>
         </div>
         
-        <div style={{
-          background: "linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(8, 145, 178, 0.05))",
-          border: "1px solid rgba(6, 182, 212, 0.2)",
-          borderRadius: "16px",
-          padding: "24px",
-          cursor: "pointer",
-          transition: "all 0.3s ease"
-        }}
-        onClick={getScoringIssuesProspects}
-        onMouseOver={(e) => {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 12px 40px rgba(6, 182, 212, 0.15)";
-          e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.4)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.2)";
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-            <div style={{ color: "#06b6d4", fontSize: "1.1rem", fontWeight: "600" }}>Scoring Issues</div>
-            <div style={{ 
-              backgroundColor: "#06b6d4",
-              color: "white",
-              padding: "4px 12px",
-              borderRadius: "20px",
-              fontSize: "0.9rem",
-              fontWeight: "600"
-            }}>{prospectHealth.scoring_issues.count}</div>
-          </div>
-          <div style={{ color: "#94a3b8", fontSize: "0.9rem", marginBottom: "12px" }}>Inconsistent scoring patterns</div>
-          <div style={{ 
-            color: "#06b6d4", 
-            fontSize: "0.85rem", 
-            fontWeight: "500",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            <span>View Details</span>
-            <span style={{ fontSize: "0.7rem" }}>→</span>
-          </div>
-        </div>
-        
-        <div style={{
-          background: "linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.05))",
-          border: "1px solid rgba(34, 197, 94, 0.2)",
-          borderRadius: "16px",
-          padding: "24px"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-            <div style={{ color: "#22c55e", fontSize: "1.1rem", fontWeight: "600" }}>Grading Coverage</div>
-            <div style={{ 
-              backgroundColor: "#22c55e",
-              color: "white",
-              padding: "4px 12px",
-              borderRadius: "20px",
-              fontSize: "0.9rem",
-              fontWeight: "600"
-            }}>{prospectHealth.grading_analysis.grading_coverage}%</div>
-          </div>
-          <div style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Prospects with assigned grades</div>
-        </div>
+
       </div>
       
       {/* Detailed Views */}
@@ -480,77 +416,7 @@ export default function ProspectsSection({
         </div>
       )}
 
-      {activeProspectView === 'scoring-issues' && scoringIssuesProspects && (
-        <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          borderRadius: "12px",
-          padding: "24px",
-          border: "1px solid rgba(255, 255, 255, 0.05)",
-          marginBottom: "16px"
-        }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px"
-          }}>
-            <h3 style={{ color: "#06b6d4", margin: 0, fontSize: "1.2rem" }}>Scoring Issues ({scoringIssuesProspects.total_scoring_issues})</h3>
-            <button
-              onClick={() => setActiveProspectView(null)}
-              style={{
-                background: "rgba(239, 68, 68, 0.2)",
-                border: "1px solid #ef4444",
-                color: "#ef4444",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                cursor: "pointer"
-              }}
-            >
-              ✕ Close
-            </button>
-          </div>
-          <div style={{
-            maxHeight: "400px",
-            overflowY: "auto",
-            display: "grid",
-            gap: "12px"
-          }}>
-            {scoringIssuesProspects.prospects_with_scoring_issues.map((prospect, index) => (
-              <div key={index} style={{
-                background: "rgba(30, 41, 59, 0.6)",
-                padding: "16px",
-                borderRadius: "8px",
-                border: "1px solid rgba(6, 182, 212, 0.3)"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontWeight: "600", color: "#f1f5f9" }}>
-                      {prospect.firstName} {prospect.lastName}
-                    </div>
-                    <div style={{ color: "#cbd5e1", fontSize: "0.9rem" }}>
-                      📧 {prospect.email}
-                    </div>
-                    <div style={{ color: "#06b6d4", fontSize: "0.8rem", marginTop: "4px" }}>
-                      ID: {prospect.id}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ color: "#f59e0b", fontWeight: "600" }}>
-                      Score: {prospect.score}
-                    </div>
-                    <div style={{ color: "#ef4444", fontSize: "0.9rem", marginTop: "4px" }}>
-                      {prospect.issue}
-                    </div>
-                    <div style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
-                      {prospect.lastActivityAt ? new Date(prospect.lastActivityAt).toLocaleDateString() : "No activity"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {!activeProspectView && (
         <div style={{

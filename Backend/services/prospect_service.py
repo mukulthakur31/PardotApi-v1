@@ -205,28 +205,22 @@ def analyze_prospect_health(prospects, headers):
     duplicates = find_duplicate_prospects(prospects)
     inactive_prospects = find_inactive_prospects(prospects)
     missing_fields = find_missing_critical_fields(prospects)
-    scoring_issues = find_scoring_inconsistencies(prospects)
-    grading_analysis = analyze_grading_setup(prospects)
     
     return {
         "total_prospects": len(prospects),
         "duplicates": {
             "count": len(duplicates),
-            "details": duplicates[:50]  # Limit to first 50 for performance
+            "details": duplicates
         },
         "inactive_prospects": {
             "count": len(inactive_prospects),
-            "details": inactive_prospects[:50]
+            "details": inactive_prospects
         },
         "missing_fields": {
             "count": len(missing_fields),
-            "details": missing_fields[:50]
+            "details": missing_fields
         },
-        "scoring_issues": {
-            "count": len(scoring_issues),
-            "details": scoring_issues[:50]
-        },
-        "grading_analysis": grading_analysis
+        "all_prospects": prospects  # Cache all prospects for detail views
     }
 
 def get_prospect_health(access_token):

@@ -10,7 +10,7 @@ from utils.auth_utils import get_credentials, extract_access_token
 
 # Import services
 from services.email_service import get_email_stats
-from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis
+from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache
 from services.Landing_page_service import get_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies
 from services.engagement_service import get_engagement_programs_analysis, get_engagement_programs_performance
@@ -35,6 +35,19 @@ CORS(app,
 
 # Google Integration
 google_integration = GoogleIntegration(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+
+# In-memory cache for all data types
+data_cache = {
+    'prospects': {},
+    'forms': {},
+    'landing_pages': {},
+    'engagement': {},
+    'emails': {}
+}
+
+# In-memory cache for prospect data (expires after 30 minutes)
+prospect_cache = {}
+CACHE_EXPIRY = 1800  # 30 minutes in seconds
 
 # ===== Authentication Routes =====
 @app.route("/setup", methods=["POST", "OPTIONS"])
@@ -172,6 +185,8 @@ def get_form_stats_route():
     
     try:
         form_stats = get_form_stats(access_token)
+        # Cache form stats for other form routes
+        data_cache['forms'][access_token] = form_stats
         return jsonify(form_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -183,7 +198,12 @@ def get_active_inactive_forms_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        forms_data = get_active_inactive_forms(access_token)
+        # Check cache first
+        cached_forms = data_cache['forms'].get(access_token)
+        if cached_forms:
+            forms_data = get_active_inactive_forms_from_cache(cached_forms)
+        else:
+            forms_data = get_active_inactive_forms(access_token)
         return jsonify(forms_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -195,7 +215,12 @@ def get_form_abandonment_analysis_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        abandonment_data = get_form_abandonment_analysis(access_token)
+        # Check cache first
+        cached_forms = data_cache['forms'].get(access_token)
+        if cached_forms:
+            abandonment_data = get_form_abandonment_analysis_from_cache(cached_forms)
+        else:
+            abandonment_data = get_form_abandonment_analysis(access_token)
         return jsonify(abandonment_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -209,6 +234,8 @@ def get_landing_page_stats_route():
     
     try:
         landing_page_stats = get_landing_page_stats(access_token)
+        # Cache landing page stats
+        data_cache['landing_pages'][access_token] = landing_page_stats
         return jsonify(landing_page_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -223,7 +250,14 @@ def get_landing_page_field_issues():
         severity = request.args.get("severity", "all").lower()
         issue_type = request.args.get("type", "all").lower()
         
-        landing_page_stats = get_landing_page_stats(access_token)
+        # Check cache first
+        cached_stats = data_cache['landing_pages'].get(access_token)
+        if cached_stats:
+            landing_page_stats = cached_stats
+        else:
+            landing_page_stats = get_landing_page_stats(access_token)
+            data_cache['landing_pages'][access_token] = landing_page_stats
+            
         field_issues = landing_page_stats.get('field_mapping_issues', {})
         
         if severity != "all" and severity in field_issues:
@@ -256,6 +290,8 @@ def get_prospect_health_route():
     
     try:
         health_data = get_prospect_health(access_token)
+        # Cache the data in memory using access token as key
+        data_cache['prospects'][access_token] = health_data
         return jsonify(health_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -263,92 +299,57 @@ def get_prospect_health_route():
 @app.route("/get-inactive-prospects", methods=["GET"])
 def get_inactive_prospects():
     access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token required"}), 401
-    
     try:
-        credentials = get_credentials()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
-        }
-        
-        prospects = fetch_all_prospects(headers)
-        inactive_prospects = find_inactive_prospects(prospects)
-        
-        return jsonify({
-            "total_inactive": len(inactive_prospects),
-            "inactive_prospects": inactive_prospects
-        })
+        # Use cached data from memory if available
+        cached_health = data_cache['prospects'].get(access_token)
+        if cached_health and 'all_prospects' in cached_health:
+            prospects = cached_health['all_prospects']
+            inactive_prospects = find_inactive_prospects(prospects)
+            
+            return jsonify({
+                "total_inactive": len(inactive_prospects),
+                "inactive_prospects": inactive_prospects
+            })
+        else:
+            return jsonify({"error": "Please run prospect health analysis first"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-duplicate-prospects", methods=["GET"])
 def get_duplicate_prospects():
     access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token required"}), 401
-    
     try:
-        credentials = get_credentials()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
-        }
-        
-        prospects = fetch_all_prospects(headers)
-        duplicates = find_duplicate_prospects(prospects)
-        
-        return jsonify({
-            "total_duplicate_groups": len(duplicates),
-            "duplicate_prospects": duplicates
-        })
+        # Use cached data from memory if available
+        cached_health = data_cache['prospects'].get(access_token)
+        if cached_health and 'all_prospects' in cached_health:
+            prospects = cached_health['all_prospects']
+            duplicates = find_duplicate_prospects(prospects)
+            
+            return jsonify({
+                "total_duplicate_groups": len(duplicates),
+                "duplicate_prospects": duplicates
+            })
+        else:
+            return jsonify({"error": "Please run prospect health analysis first"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-missing-fields-prospects", methods=["GET"])
 def get_missing_fields_prospects():
     access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token required"}), 401
-    
     try:
-        credentials = get_credentials()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
-        }
-        
-        prospects = fetch_all_prospects(headers)
-        missing_fields = find_missing_critical_fields(prospects)
-        
-        return jsonify({
-            "total_with_missing_fields": len(missing_fields),
-            "prospects_missing_fields": missing_fields
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/get-scoring-issues-prospects", methods=["GET"])
-def get_scoring_issues_prospects():
-    access_token = extract_access_token(request.headers.get("Authorization"))
-    if not access_token:
-        return jsonify({"error": "Access token required"}), 401
-    
-    try:
-        credentials = get_credentials()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
-        }
-        
-        prospects = fetch_all_prospects(headers)
-        scoring_issues = find_scoring_inconsistencies(prospects)
-        
-        return jsonify({
-            "total_scoring_issues": len(scoring_issues),
-            "prospects_with_scoring_issues": scoring_issues
-        })
+        # Use cached data from memory if available
+        cached_health = data_cache['prospects'].get(access_token)
+        if cached_health and 'all_prospects' in cached_health:
+            prospects = cached_health['all_prospects']
+            missing_fields = find_missing_critical_fields(prospects)
+            
+            return jsonify({
+                "total_with_missing_fields": len(missing_fields),
+                "prospects_missing_fields": missing_fields
+            })
+        else:
+            return jsonify({"error": "Please run prospect health analysis first"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -361,6 +362,8 @@ def get_engagement_programs_analysis_route():
     
     try:
         analysis_data = get_engagement_programs_analysis(access_token)
+        # Cache engagement data
+        data_cache['engagement'][access_token] = analysis_data
         return jsonify(analysis_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -372,7 +375,13 @@ def get_engagement_programs_performance_route():
         return jsonify({"error": "Access token required"}), 401
     
     try:
-        performance_data = get_engagement_programs_performance(access_token)
+        # Check cache first
+        cached_data = data_cache['engagement'].get(access_token)
+        if cached_data:
+            # Use cached data to generate performance metrics
+            performance_data = cached_data
+        else:
+            performance_data = get_engagement_programs_performance(access_token)
         return jsonify(performance_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

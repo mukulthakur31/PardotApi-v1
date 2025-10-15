@@ -82,7 +82,7 @@ export default function Dashboard() {
   const [inactiveProspects, setInactiveProspects] = useState(null);
   const [duplicateProspects, setDuplicateProspects] = useState(null);
   const [missingFieldsProspects, setMissingFieldsProspects] = useState(null);
-  const [scoringIssuesProspects, setScoringIssuesProspects] = useState(null);
+
   const [activeProspectView, setActiveProspectView] = useState(null);
   const [activeFormView, setActiveFormView] = useState(null);
   const [activeLandingPageView, setActiveLandingPageView] = useState(null);
@@ -275,19 +275,7 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   };
 
-  const getScoringIssuesProspects = () => {
-    setLoading(true);
-    axios
-      .get("http://localhost:4001/get-scoring-issues-prospects", {
-        headers: { Authorization: token }
-      })
-      .then((res) => {
-        setScoringIssuesProspects(res.data);
-        setActiveProspectView('scoring-issues');
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
-  };
+
 
   const getActiveInactiveForms = () => {
     setLoading(true);
@@ -948,11 +936,9 @@ export default function Dashboard() {
             inactiveProspects={inactiveProspects}
             duplicateProspects={duplicateProspects}
             missingFieldsProspects={missingFieldsProspects}
-            scoringIssuesProspects={scoringIssuesProspects}
             getDuplicateProspects={getDuplicateProspects}
             getInactiveProspects={getInactiveProspects}
             getMissingFieldsProspects={getMissingFieldsProspects}
-            getScoringIssuesProspects={getScoringIssuesProspects}
           />
         )}
         

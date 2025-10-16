@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import EmailSection from "./sections/EmailSection";
+import EmailStatsDisplay from "./sections/EmailStatsDisplay";
 import FormsSection from "./sections/FormsSection";
 import LandingPagesSection from "./sections/LandingPagesSection";
 import ProspectsSection from "./sections/ProspectsSection";
 import EngagementSection from "./sections/EngagementSection";
 import UTMSection from "./sections/UTMSection";
 import StatusCards from "./sections/StatusCards";
-import DateFilters from "./sections/DateFilters";
+import CustomDateFilter from "./sections/CustomDateFilter";
 import ActionTiles from "./sections/ActionTiles";
 
 // Configure axios to include credentials
@@ -97,9 +97,9 @@ export default function Dashboard() {
   // Campaign engagement states
   const [campaignEngagement, setCampaignEngagement] = useState(null);
 
-  const [day, setDay] = useState("");
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -188,9 +188,9 @@ export default function Dashboard() {
 
   const getEmailStats = () => {
     const params = {};
-    if (day) params.day = day;
-    if (month) params.month = month;
-    if (year) params.year = year;
+    if (filterType) params.filter_type = filterType;
+    if (startDate) params.start_date = startDate + "T00:00:00Z";
+    if (endDate) params.end_date = endDate + "T23:59:59Z";
 
     setLoading(true);
     axios
@@ -371,7 +371,7 @@ export default function Dashboard() {
       requestData = {
         data_type: "emails",
         data: stats,
-        filters: { day, month, year }
+        filters: { filterType, startDate, endDate }
       };
       filename = "email_campaign_report.pdf";
     } else if (activeTab === "forms") {
@@ -465,7 +465,7 @@ export default function Dashboard() {
       
       if (activeTab === "emails") {
         exportData = {
-          title: `Email Stats ${year || new Date().getFullYear()}`,
+          title: `Email Stats ${filterType ? filterType.replace('_', ' ').toUpperCase() : new Date().getFullYear()}`,
           data_type: "emails",
           data: stats
         };
@@ -565,7 +565,7 @@ export default function Dashboard() {
         "http://localhost:4001/export-to-drive",
         {
           spreadsheet_id: spreadsheetId,
-          filename: `email_stats_${year || new Date().getFullYear()}`
+          filename: `email_stats_${filterType || new Date().getFullYear()}`
         }
       );
 
@@ -847,15 +847,15 @@ export default function Dashboard() {
           animation: "fadeIn 1.2s ease-out",
           overflow: "auto"
         }}>
-        {/* Date Filters - Only for emails */}
+        {/* Custom Date Filter - Only for emails */}
         {activeTab === "emails" && (
-          <DateFilters 
-            day={day} 
-            month={month} 
-            year={year} 
-            setDay={setDay} 
-            setMonth={setMonth} 
-            setYear={setYear} 
+          <CustomDateFilter 
+            filterType={filterType}
+            setFilterType={setFilterType}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
           />
         )}
 
@@ -912,7 +912,14 @@ export default function Dashboard() {
         )}
 
         {/* Stats Display */}
-        {activeTab === "emails" && <EmailSection stats={stats} loading={loading} />}
+        {activeTab === "emails" && (
+          <EmailStatsDisplay 
+            stats={stats} 
+            filterType={filterType}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        )}
         
         {activeTab === "forms" && (
           <FormsSection 

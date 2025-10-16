@@ -1,10 +1,10 @@
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from utils.auth_utils import get_credentials
 
-def fetch_all_mails(access_token, fields="id,name,subject,createdAt", day=None, month=None, year=None):
-    """Fetch all emails with optional date filtering"""
+def fetch_all_mails(access_token, fields="id,name,subject,createdAt", filter_type=None, start_date=None, end_date=None):
+    """Fetch all emails with custom date filtering"""
     try:
         credentials = get_credentials()
         headers = {
@@ -12,23 +12,40 @@ def fetch_all_mails(access_token, fields="id,name,subject,createdAt", day=None, 
             "Pardot-Business-Unit-Id": credentials['business_unit_id']
         }
         
-        print(f"Fetching mails with headers: {headers}")
+        print(f"Fetching mails with filter_type: {filter_type}, start_date: {start_date}, end_date: {end_date}")
         
-        # Calculate date threshold
-        if day and month and year:
+        # Calculate date range based on filter type
+        now = datetime.now(timezone.utc)
+        
+        if filter_type == "custom" and start_date and end_date:
             try:
-                start_date = datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
-                print(f"Using date filter: {start_date}")
+                filter_start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                filter_end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                print(f"Using custom date range: {filter_start} to {filter_end}")
             except ValueError as e:
-                print(f"Invalid date parameters: {e}")
+                print(f"Invalid custom date parameters: {e}")
                 return []
+        elif filter_type == "last_7_days":
+            filter_start = now - timedelta(days=7)
+            filter_end = now
+        elif filter_type == "last_30_days":
+            filter_start = now - timedelta(days=30)
+            filter_end = now
+        elif filter_type == "last_3_months":
+            filter_start = now - timedelta(days=90)
+            filter_end = now
+        elif filter_type == "last_6_months":
+            filter_start = now - timedelta(days=180)
+            filter_end = now
         else:
-            now = datetime.now(timezone.utc)
-            start_date = datetime(now.year, 1, 1, tzinfo=timezone.utc)
-            print(f"Using default date filter: {start_date}")
+            # Default to current year
+            filter_start = datetime(now.year, 1, 1, tzinfo=timezone.utc)
+            filter_end = now
+            print(f"Using default date filter: {filter_start} to {filter_end}")
 
-        date_threshold = start_date.isoformat().replace("+00:00", "Z")
-        print(f"Date threshold: {date_threshold}")
+        start_threshold = filter_start.isoformat().replace("+00:00", "Z")
+        end_threshold = filter_end.isoformat().replace("+00:00", "Z")
+        print(f"Date range: {start_threshold} to {end_threshold}")
         
         # Fetch emails with pagination
         all_mails = []
@@ -51,7 +68,7 @@ def fetch_all_mails(access_token, fields="id,name,subject,createdAt", day=None, 
             
             for email in emails:
                 email_date = email.get("createdAt", "")
-                if email_date >= date_threshold:
+                if start_threshold <= email_date <= end_threshold:
                     all_mails.append(email)
 
             url = data.get("nextPageUrl")
@@ -124,14 +141,14 @@ def fetch_email_stats_parallel(access_token, emails):
         traceback.print_exc()
         return []
 
-def get_email_stats(access_token, day=None, month=None, year=None):
+def get_email_stats(access_token, filter_type=None, start_date=None, end_date=None):
     """Main function to get email statistics"""
     try:
         get_credentials()  # Validate credentials exist
         
-        print(f"Fetching emails with params: day={day}, month={month}, year={year}")
+        print(f"Fetching emails with params: filter_type={filter_type}, start_date={start_date}, end_date={end_date}")
         
-        emails = fetch_all_mails(access_token, day=day, month=month, year=year)
+        emails = fetch_all_mails(access_token, filter_type=filter_type, start_date=start_date, end_date=end_date)
         print(f"Found {len(emails)} emails")
         
         stats_list = fetch_email_stats_parallel(access_token, emails)

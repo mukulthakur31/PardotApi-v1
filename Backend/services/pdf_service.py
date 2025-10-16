@@ -9,7 +9,7 @@ from reportlab.graphics.charts.piecharts import Pie
 from io import BytesIO
 from datetime import datetime
 
-def create_professional_pdf_report(stats_list, day=None, month=None, year=None):
+def create_professional_pdf_report(stats_list, filterType=None, startDate=None, endDate=None):
     """Generate a modern, compact professional PDF report"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.75*inch, bottomMargin=0.75*inch, leftMargin=0.75*inch, rightMargin=0.75*inch)
@@ -17,7 +17,7 @@ def create_professional_pdf_report(stats_list, day=None, month=None, year=None):
     content = []
     
     # 1. HEADER & SUMMARY (Single Page)
-    content.extend(create_modern_header_and_summary(stats_list, day, month, year))
+    content.extend(create_modern_header_and_summary(stats_list, filterType, startDate, endDate))
     
     # 2. EMAIL PERFORMANCE TABLE (Compact)
     if stats_list:
@@ -206,7 +206,7 @@ def create_prospect_pdf_report(health_data):
     return buffer
 
 # Helper functions for email PDF report
-def create_modern_header_and_summary(stats_list, day, month, year):
+def create_modern_header_and_summary(stats_list, filterType, startDate, endDate):
     """Create modern header with integrated summary"""
     styles = getSampleStyleSheet()
     content = []
@@ -223,8 +223,12 @@ def create_modern_header_and_summary(stats_list, day, month, year):
     content.append(Paragraph("📊 EMAIL CAMPAIGN PERFORMANCE REPORT", header_style))
     
     # Date and generation info
-    if day and month and year:
-        date_str = f"Campaign Data From: {month}/{day}/{year} onwards • Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+    if filterType and filterType != "":
+        if filterType == "custom" and startDate and endDate:
+            date_str = f"Custom Date Range: {startDate} to {endDate} • Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
+        else:
+            filter_display = filterType.replace('_', ' ').title()
+            date_str = f"Filter: {filter_display} • Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
     else:
         date_str = f"All Campaign Data • Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}"
     

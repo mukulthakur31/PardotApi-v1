@@ -66,12 +66,15 @@ export default function ActionTiles({
               disabled={!token || loading}
               style={{
                 ...modernButtonStyle,
-                background: "linear-gradient(135deg, #64748b, #475569)",
+                background: loading ? "linear-gradient(135deg, #64748b, #475569)" : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
                 marginBottom: "16px",
-                width: "100%"
+                width: "100%",
+                fontSize: "1.1rem",
+                padding: "16px 28px",
+                boxShadow: "0 6px 20px rgba(59, 130, 246, 0.3)"
               }}
             >
-              Get Email Stats
+              {loading ? "⏳ Loading..." : "📊 Get Email Stats"}
             </button>
             <button
               onClick={downloadPDF}

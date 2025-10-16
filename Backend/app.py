@@ -167,11 +167,11 @@ def get_email_stats_route():
         return jsonify({"error": "Access token is required"}), 401
 
     try:
-        day = request.args.get("day")
-        month = request.args.get("month")
-        year = request.args.get("year")
+        filter_type = request.args.get("filter_type")
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
         
-        stats_list = get_email_stats(access_token, day, month, year)
+        stats_list = get_email_stats(access_token, filter_type, start_date, end_date)
         return jsonify(stats_list)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

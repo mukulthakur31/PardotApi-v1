@@ -1,7 +1,42 @@
 import React from "react";
 
 export default function EmailStatsDisplay({ stats, filterType, startDate, endDate }) {
-  if (!stats || stats.length === 0) return null;
+  // If stats is an empty array (backend returned no results), show no emails message
+  if (stats && stats.length === 0) {
+    return (
+      <div style={{
+        background: "rgba(30, 41, 59, 0.6)",
+        borderRadius: "16px",
+        padding: "48px 32px",
+        border: "1px solid rgba(255, 255, 255, 0.05)",
+        textAlign: "center"
+      }}>
+        <div style={{
+          fontSize: "3rem",
+          marginBottom: "16px"
+        }}>📭</div>
+        <h3 style={{
+          color: "#f1f5f9",
+          fontSize: "1.5rem",
+          fontWeight: "600",
+          marginBottom: "12px"
+        }}>
+          No Emails Found
+        </h3>
+        <p style={{
+          color: "#94a3b8",
+          fontSize: "1rem"
+        }}>
+          No email campaigns found for the selected time range.
+        </p>
+      </div>
+    );
+  }
+
+  // If stats is null/undefined (no search performed yet), show nothing
+  if (!stats) {
+    return null;
+  }
 
   // Calculate totals
   const totalSent = stats.reduce((sum, email) => sum + (email.stats?.sent || 0), 0);

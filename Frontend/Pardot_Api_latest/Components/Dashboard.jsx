@@ -65,7 +65,7 @@ if (typeof document !== 'undefined') {
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState([]);
+  const [stats, setStats] = useState(null);
   const [formStats, setFormStats] = useState([]);
   const [activeInactiveForms, setActiveInactiveForms] = useState(null);
   const [formAbandonmentData, setFormAbandonmentData] = useState(null);
@@ -100,6 +100,11 @@ export default function Dashboard() {
   const [filterType, setFilterType] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Clear stats when filter changes
+  useEffect(() => {
+    setStats(null);
+  }, [filterType, startDate, endDate]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

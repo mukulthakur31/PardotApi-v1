@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 from utils.auth_utils import get_credentials
+from .prospect_filter_service import filter_prospects
 
 def fetch_all_prospects(headers):
     """Fetch all prospects with pagination"""
@@ -8,7 +9,7 @@ def fetch_all_prospects(headers):
     url = "https://pi.pardot.com/api/v5/objects/prospects"
     params = {
         "fields": "id,email,firstName,lastName,country,jobTitle,score,grade,lastActivityAt,createdAt",
-        "limit": 200
+        "limit": 1000
     }
     
     while url:
@@ -220,7 +221,7 @@ def analyze_prospect_health(prospects, headers):
             "count": len(missing_fields),
             "details": missing_fields
         },
-        "all_prospects": prospects  # Cache all prospects for detail views
+        "all_prospects": prospects  # Cache all prospects for filtering
     }
 
 def get_prospect_health(access_token):
@@ -238,4 +239,29 @@ def get_prospect_health(access_token):
         return health_data
     except Exception as e:
         print(f"Error in get_prospect_health: {str(e)}")
+        raise e
+
+def get_filtered_prospects(access_token, filters):
+    """Get filtered prospects based on provided filters"""
+    try:
+        credentials = get_credentials()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+        }
+        
+        # Get all prospects (this could be cached for better performance)
+        prospects = fetch_all_prospects(headers)
+        
+        # Apply filters
+        filtered_prospects = filter_prospects(prospects, filters)
+        
+        return {
+            "total_prospects": len(prospects),
+            "filtered_count": len(filtered_prospects),
+            "prospects": filtered_prospects,
+            "filters_applied": filters
+        }
+    except Exception as e:
+        print(f"Error in get_filtered_prospects: {str(e)}")
         raise e

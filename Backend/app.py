@@ -12,7 +12,7 @@ from utils.auth_utils import get_credentials, extract_access_token
 from services.email_service import get_email_stats
 from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache
 from services.Landing_page_service import get_landing_page_stats
-from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies
+from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies, get_filtered_prospects
 from services.engagement_service import get_engagement_programs_analysis, get_engagement_programs_performance
 from services.pdf_service import create_professional_pdf_report, create_form_pdf_report, create_prospect_pdf_report, create_comprehensive_summary_pdf
 from services.utm_service import get_utm_analysis, get_campaign_engagement_analysis
@@ -352,6 +352,164 @@ def get_missing_fields_prospects():
             return jsonify({"error": "Please run prospect health analysis first"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/filter-prospects", methods=["POST"])
+def filter_prospects_route():
+    try:
+        filters = request.json or {}
+        print(f"[DEBUG] Received filters: {filters}")
+        
+        # Get the first (and likely only) cached prospect data
+        if not data_cache['prospects']:
+            return jsonify({"error": "Please run prospect health analysis first"}), 400
+        
+        # Use the first available cached data
+        cached_key = list(data_cache['prospects'].keys())[0]
+        cached_health = data_cache['prospects'][cached_key]
+        
+        if 'all_prospects' not in cached_health:
+            print(f"[DEBUG] Cached data keys: {list(cached_health.keys())}")
+            return jsonify({"error": "Cached data missing all_prospects"}), 400
+        
+        prospects = cached_health['all_prospects']
+        print(f"[DEBUG] Found {len(prospects)} cached prospects")
+        
+        # Apply simple client-side filtering
+        filtered_prospects = apply_simple_filters(prospects, filters)
+        
+        return jsonify({
+            "total_prospects": len(prospects),
+            "filtered_count": len(filtered_prospects),
+            "prospects": filtered_prospects,
+            "filters_applied": filters
+        })
+    except Exception as e:
+        print(f"[DEBUG] Filter error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def apply_simple_filters(prospects, filters):
+    """Apply basic filters to prospect data"""
+    filtered = prospects.copy()
+    
+    # View filters
+    view = filters.get('view', 'All Prospects')
+    if view == 'Active Prospects':
+        filtered = [p for p in filtered if p.get('lastActivityAt')]
+    elif view == 'Never Active Prospects':
+        filtered = [p for p in filtered if not p.get('lastActivityAt')]
+    elif view == 'Active Prospects For Review':
+        filtered = [p for p in filtered if p.get('lastActivityAt') and not p.get('isReviewed')]
+    elif view == 'Assigned Prospects':
+        filtered = [p for p in filtered if p.get('assignedTo')]
+    elif view == 'Mailable Prospects':
+        filtered = [p for p in filtered if not p.get('isDoNotEmail', False) and p.get('email')]
+    elif view == 'My Prospects':
+        filtered = [p for p in filtered if p.get('assignedTo') == 'current_user']
+    elif view == 'My Starred Prospects':
+        filtered = [p for p in filtered if p.get('isStarred')]
+    elif view == 'Prospects Not In Salesforce':
+        filtered = [p for p in filtered if not p.get('salesforceId')]
+    elif view == 'Reviewed Prospects':
+        filtered = [p for p in filtered if p.get('isReviewed')]
+    elif view == 'Unassigned Prospects':
+        filtered = [p for p in filtered if not p.get('assignedTo')]
+    elif view == 'Unmailable Prospects':
+        filtered = [p for p in filtered if p.get('isDoNotEmail', False)]
+    elif view == 'Unsubscribed Prospects':
+        filtered = [p for p in filtered if p.get('optedOut', False)]
+    elif view == 'Paused Prospects':
+        filtered = [p for p in filtered if p.get('isPaused', False)]
+    elif view == 'Undelivered Prospects':
+        filtered = [p for p in filtered if p.get('isEmailHardBounced', False)]
+    
+    # Time filters
+    time_filter = filters.get('time', 'All Time')
+    if time_filter != 'All Time':
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        activity_field = 'lastActivityAt' if filters.get('activity') == 'Last Activity' else 'createdAt'
+        
+        start_date = None
+        end_date = None
+        
+        if time_filter == 'Today':
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+        elif time_filter == 'Yesterday':
+            yesterday = now - timedelta(days=1)
+            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif time_filter == 'This Quarter':
+            quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+            start_date = now.replace(month=quarter_start_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+        elif time_filter == 'This Month':
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+        elif time_filter == 'This Year':
+            start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now
+        elif time_filter == 'Last 7 Days':
+            start_date = now - timedelta(days=7)
+            end_date = now
+        elif time_filter == 'Last Week':
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_date = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = last_monday + timedelta(days=6, hours=23, minutes=59, seconds=59)
+        elif time_filter == 'Last Month':
+            if now.month == 1:
+                start_date = now.replace(year=now.year-1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+            else:
+                start_date = now.replace(month=now.month-1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+        elif time_filter == 'Last Quarter':
+            current_quarter = (now.month - 1) // 3 + 1
+            if current_quarter == 1:
+                start_date = now.replace(year=now.year-1, month=10, day=1, hour=0, minute=0, second=0, microsecond=0)
+                end_date = now.replace(year=now.year-1, month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                last_quarter_start_month = (current_quarter - 2) * 3 + 1
+                last_quarter_end_month = (current_quarter - 1) * 3
+                start_date = now.replace(month=last_quarter_start_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+                if last_quarter_end_month in [1, 3, 5, 7, 8, 10, 12]:
+                    last_day = 31
+                elif last_quarter_end_month in [4, 6, 9, 11]:
+                    last_day = 30
+                else:
+                    last_day = 29 if now.year % 4 == 0 and (now.year % 100 != 0 or now.year % 400 == 0) else 28
+                end_date = now.replace(month=last_quarter_end_month, day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+        elif time_filter == 'Last Year':
+            start_date = now.replace(year=now.year-1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = now.replace(year=now.year-1, month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+        
+        if start_date:
+            time_filtered = []
+            for p in filtered:
+                date_val = p.get(activity_field)
+                if date_val:
+                    try:
+                        if 'T' in str(date_val):
+                            prospect_date = datetime.fromisoformat(str(date_val).replace('Z', '+00:00'))
+                        else:
+                            prospect_date = datetime.strptime(str(date_val)[:10], '%Y-%m-%d')
+                        
+                        prospect_date = prospect_date.replace(tzinfo=None)
+                        if end_date:
+                            if start_date <= prospect_date <= end_date:
+                                time_filtered.append(p)
+                        else:
+                            if prospect_date >= start_date:
+                                time_filtered.append(p)
+                    except:
+                        continue
+            filtered = time_filtered
+    
+    print(f"[DEBUG] Filtered to {len(filtered)} prospects")
+    return filtered
 
 # ===== Engagement Programs Routes =====
 @app.route("/get-engagement-programs-analysis", methods=["GET"])

@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import ProspectFilters from "./ProspectFilters";
+import FilteredProspectsTable from "./FilteredProspectsTable";
 
 export default function ProspectsSection({ 
   prospectHealth,
@@ -11,6 +13,64 @@ export default function ProspectsSection({
   getInactiveProspects,
   getMissingFieldsProspects
 }) {
+  const [filteredProspects, setFilteredProspects] = useState([]);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Initialize with all prospects when component mounts
+  useEffect(() => {
+    if (prospectHealth?.all_prospects) {
+      console.log('Setting initial prospects:', prospectHealth.all_prospects.length);
+      setFilteredProspects(prospectHealth.all_prospects);
+    }
+  }, [prospectHealth]);
+
+  // Prevent scroll jumping during updates
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+      const timer = setTimeout(() => {
+        document.body.style.overflow = 'auto';
+      }, 100);
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = 'auto';
+      };
+    }
+  }, [prospectHealth, filteredProspects]);
+
+  const handleFiltersChange = async (filters) => {
+    setIsFilterLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      console.log('Sending filters:', filters);
+      
+      const response = await fetch('http://127.0.0.1:4001/filter-prospects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(filters)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Filter response:', data);
+        setFilteredProspects(data.prospects || []);
+      } else {
+        const errorText = await response.text();
+        console.error('Filter failed:', response.status, errorText);
+        setFilteredProspects([]);
+      }
+    } catch (error) {
+      console.error('Error filtering prospects:', error);
+      setFilteredProspects([]);
+    } finally {
+      setIsFilterLoading(false);
+    }
+  };
+  
   if (!prospectHealth) return null;
 
   return (
@@ -18,7 +78,11 @@ export default function ProspectsSection({
       background: "rgba(30, 41, 59, 0.6)",
       borderRadius: "16px",
       padding: "32px",
-      border: "1px solid rgba(255, 255, 255, 0.05)"
+      border: "1px solid rgba(255, 255, 255, 0.05)",
+      minHeight: "600px",
+      position: "relative",
+      willChange: "auto",
+      transform: "translateZ(0)"
     }}>
       <div style={{
         display: "flex",
@@ -419,31 +483,53 @@ export default function ProspectsSection({
 
 
       {!activeProspectView && (
-        <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          borderRadius: "12px",
-          padding: "24px",
-          overflowX: "auto",
-          maxHeight: "500px",
-          overflowY: "auto",
-          border: "1px solid rgba(255, 255, 255, 0.05)"
-        }}>
-          <div style={{ textAlign: "center", color: "#cbd5e1", padding: "20px" }}>
-            <div style={{ 
-              width: "60px",
-              height: "60px",
-              borderRadius: "50%",
-              backgroundColor: "rgba(59, 130, 246, 0.2)",
-              border: "2px solid #3b82f6",
-              margin: "0 auto 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.5rem",
-              color: "#3b82f6"
-            }}>↑</div>
-            <p>Click on any health metric above to view detailed information about those prospects.</p>
+        <div>
+          {/* Filter Toggle Button */}
+          <div style={{
+            marginBottom: "16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                background: showFilters ? "rgba(34, 197, 94, 0.2)" : "rgba(59, 130, 246, 0.2)",
+                border: `1px solid ${showFilters ? "#22c55e" : "#3b82f6"}`,
+                color: showFilters ? "#22c55e" : "#3b82f6",
+                padding: "10px 20px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                fontWeight: "500",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {showFilters ? "Hide Filters" : "Show Prospect Filters"}
+              <span style={{ fontSize: "0.8rem" }}>{showFilters ? "▼" : "▶"}</span>
+            </button>
+            
+            <div style={{ color: "#94a3b8", fontSize: "0.9rem" }}>
+              Click on health metrics above for detailed analysis
+            </div>
           </div>
+
+          {/* Filters Component */}
+          {showFilters && (
+            <ProspectFilters
+              onFiltersChange={handleFiltersChange}
+              totalProspects={prospectHealth?.total_prospects || 0}
+              filteredCount={filteredProspects.length}
+            />
+          )}
+
+          {/* Filtered Prospects Table */}
+          <FilteredProspectsTable
+            prospects={filteredProspects}
+            isLoading={isFilterLoading}
+          />
         </div>
       )}
     </div>

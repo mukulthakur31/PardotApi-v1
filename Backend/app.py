@@ -10,7 +10,7 @@ from utils.auth_utils import get_credentials, extract_access_token
 
 # Import services
 from services.email_service import get_email_stats
-from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache
+from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache, get_filtered_form_stats
 from services.Landing_page_service import get_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies, get_filtered_prospects
 from services.engagement_service import get_engagement_programs_analysis, get_engagement_programs_performance
@@ -222,6 +222,17 @@ def get_form_abandonment_analysis_route():
         else:
             abandonment_data = get_form_abandonment_analysis(access_token)
         return jsonify(abandonment_data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/get-filtered-form-stats", methods=["GET"])
+def get_filtered_form_stats_route():
+    try:
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+        
+        filtered_stats = get_filtered_form_stats(start_date, end_date)
+        return jsonify(filtered_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

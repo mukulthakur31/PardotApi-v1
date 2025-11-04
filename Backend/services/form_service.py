@@ -179,6 +179,39 @@ def save_all_form_stats_to_file(form_stats):
         print(f"Error saving form stats: {str(e)}")
 
 
+def get_filtered_form_stats(start_date=None, end_date=None):
+    """Get form stats from file with optional date filtering"""
+    try:
+        with open("form_stats.json", 'r') as f:
+            form_stats = json.load(f)
+        
+        if not start_date and not end_date:
+            return form_stats
+        
+        filtered_stats = []
+        for form in form_stats:
+            form_date = form.get("created_at")
+            if form_date:
+                # Parse form creation date
+                form_datetime = datetime.fromisoformat(form_date.replace('Z', '+00:00'))
+                form_date_only = form_datetime.date()
+                
+                # Apply date filters
+                if start_date and form_date_only < datetime.fromisoformat(start_date).date():
+                    continue
+                if end_date and form_date_only > datetime.fromisoformat(end_date).date():
+                    continue
+                    
+            filtered_stats.append(form)
+        
+        return filtered_stats
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        print(f"Error reading form stats: {str(e)}")
+        return []
+
+
 def get_form_abandonment_analysis(access_token):
     """Analyze form abandonment patterns and issues"""
     try:

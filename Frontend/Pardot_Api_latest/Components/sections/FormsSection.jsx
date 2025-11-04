@@ -1,4 +1,276 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+
+// Configure axios to include credentials
+axios.defaults.withCredentials = true;
+
+function FormStatsWithFilter({ formStats }) {
+  const [filteredStats, setFilteredStats] = useState(formStats);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const applyDateFilter = async () => {
+    if (!startDate && !endDate) {
+      setFilteredStats(formStats);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response = await axios.get("http://localhost:4001/get-filtered-form-stats", {
+        params
+      });
+      setFilteredStats(response.data);
+    } catch (error) {
+      console.error("Error filtering form stats:", error);
+      alert("Error applying filters. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setFilteredStats(formStats);
+  };
+
+  return (
+    <div style={{
+      background: "rgba(30, 41, 59, 0.6)",
+      borderRadius: "16px",
+      padding: "32px",
+      border: "1px solid rgba(255, 255, 255, 0.05)"
+    }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "24px",
+        flexWrap: "wrap",
+        gap: "16px"
+      }}>
+        <h2 style={{
+          fontSize: "1.75rem",
+          fontWeight: "700",
+          margin: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          color: "#f1f5f9"
+        }}>
+          Form Statistics
+          <span style={{
+            background: "linear-gradient(135deg, #475569, #334155)",
+            color: "#ffffff",
+            padding: "6px 12px",
+            borderRadius: "8px",
+            fontSize: "0.875rem",
+            fontWeight: "600"
+          }}>
+            {filteredStats.length} forms
+          </span>
+        </h2>
+      </div>
+
+      <div style={{
+        background: "rgba(15, 23, 42, 0.8)",
+        borderRadius: "12px",
+        padding: "20px",
+        marginBottom: "24px",
+        border: "1px solid rgba(255, 255, 255, 0.05)"
+      }}>
+        <h3 style={{
+          color: "#f1f5f9",
+          fontSize: "1.1rem",
+          fontWeight: "600",
+          marginBottom: "16px",
+          margin: 0
+        }}>📅 Filter by Creation Date</h3>
+        
+        <div style={{
+          display: "flex",
+          gap: "16px",
+          alignItems: "center",
+          flexWrap: "wrap",
+          marginTop: "16px"
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(30, 41, 59, 0.8)",
+                color: "#f1f5f9",
+                fontSize: "0.9rem"
+              }}
+            />
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(30, 41, 59, 0.8)",
+                color: "#f1f5f9",
+                fontSize: "0.9rem"
+              }}
+            />
+          </div>
+          
+          <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
+            <button
+              onClick={applyDateFilter}
+              disabled={loading}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "rgba(99, 102, 241, 0.5)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                color: "#ffffff",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: "600",
+                fontSize: "0.9rem"
+              }}
+            >
+              {loading ? "Filtering..." : "Apply Filter"}
+            </button>
+            
+            <button
+              onClick={clearFilters}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid rgba(239, 68, 68, 0.5)",
+                background: "rgba(239, 68, 68, 0.1)",
+                color: "#ef4444",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "0.9rem"
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div style={{
+        background: "rgba(15, 23, 42, 0.8)",
+        borderRadius: "8px",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        overflow: "hidden"
+      }}>
+        <div style={{
+          maxHeight: "600px",
+          overflowY: "auto"
+        }}>
+          <table style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "0.9rem"
+          }}>
+            <thead>
+              <tr style={{
+                background: "rgba(30, 41, 59, 0.8)",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.1)"
+              }}>
+                <th style={{ padding: "12px 8px", textAlign: "left", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Form Name</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Status</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Views</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Unique Views</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Submissions</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Unique Subs</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Abandoned</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Abandon %</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Convert %</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Clicks</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Conversions</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Created</th>
+                <th style={{ padding: "12px 8px", textAlign: "center", color: "#f1f5f9", fontWeight: "600", fontSize: "0.85rem" }}>Last Activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStats.map((form, index) => {
+                const formatDate = (dateStr) => {
+                  if (!dateStr) return "N/A";
+                  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' });
+                };
+
+                return (
+                  <tr key={index} style={{
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                    transition: "background-color 0.2s ease"
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(30, 41, 59, 0.5)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}>
+                    <td style={{ padding: "10px 8px", color: "#e2e8f0" }}>
+                      <div style={{ fontWeight: "500" }}>{form.name}</div>
+                      <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ID: {form.id}</div>
+                    </td>
+                    <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                      <span style={{
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        fontSize: "0.75rem",
+                        fontWeight: "500",
+                        background: form.is_active ? "rgba(34, 197, 94, 0.2)" : "rgba(107, 114, 128, 0.2)",
+                        color: form.is_active ? "#22c55e" : "#9ca3af"
+                      }}>
+                        {form.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0", fontWeight: "500" }}>{form.views}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0" }}>{form.unique_views}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0", fontWeight: "500" }}>{form.submissions}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0" }}>{form.unique_submissions}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0" }}>{form.abandoned}</td>
+                    <td style={{ 
+                      padding: "10px 8px", 
+                      textAlign: "center", 
+                      color: form.abandonment_rate >= 70 ? "#ef4444" : form.abandonment_rate >= 40 ? "#f59e0b" : "#e2e8f0",
+                      fontWeight: "500"
+                    }}>{form.abandonment_rate}%</td>
+                    <td style={{ 
+                      padding: "10px 8px", 
+                      textAlign: "center", 
+                      color: form.conversion_rate >= 50 ? "#22c55e" : "#e2e8f0",
+                      fontWeight: "500"
+                    }}>{form.conversion_rate}%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0" }}>{form.clicks}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#e2e8f0", fontWeight: "500" }}>{form.conversions}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#94a3b8", fontSize: "0.8rem" }}>{formatDate(form.created_at)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", color: "#94a3b8", fontSize: "0.8rem" }}>{formatDate(form.last_activity)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FormsSection({ 
   formStats, 
@@ -340,63 +612,7 @@ export default function FormsSection({
 
   if (formStats && formStats.length > 0 && !activeFormView) {
     return (
-      <div style={{
-        background: "rgba(30, 41, 59, 0.6)",
-        borderRadius: "16px",
-        padding: "32px",
-        border: "1px solid rgba(255, 255, 255, 0.05)"
-      }}>
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "24px",
-          flexWrap: "wrap",
-          gap: "16px"
-        }}>
-          <h2 style={{
-            fontSize: "1.75rem",
-            fontWeight: "700",
-            margin: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            color: "#f1f5f9"
-          }}>
-            Form Statistics
-            <span style={{
-              background: "linear-gradient(135deg, #475569, #334155)",
-              color: "#ffffff",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              fontWeight: "600"
-            }}>
-              {formStats.length} forms
-            </span>
-          </h2>
-        </div>
-        
-        <div style={{
-          background: "rgba(15, 23, 42, 0.8)",
-          borderRadius: "12px",
-          padding: "24px",
-          overflowX: "auto",
-          maxHeight: "500px",
-          overflowY: "auto",
-          border: "1px solid rgba(255, 255, 255, 0.05)"
-        }}>
-          <pre style={{
-            whiteSpace: "pre-wrap",
-            margin: 0,
-            fontSize: "0.9rem",
-            lineHeight: "1.6",
-            color: "#e2e8f0"
-          }}>
-            {JSON.stringify(formStats, null, 2)}
-          </pre>
-        </div>
-      </div>
+      <FormStatsWithFilter formStats={formStats} />
     );
   }
 

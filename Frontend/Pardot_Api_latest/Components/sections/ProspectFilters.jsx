@@ -89,11 +89,13 @@ export default function ProspectFilters({ onFiltersChange, totalProspects, filte
 
   return (
     <div style={{
-      background: "rgba(30, 41, 59, 0.6)",
-      borderRadius: "16px",
-      padding: "24px",
-      border: "1px solid rgba(255, 255, 255, 0.05)",
-      marginBottom: "24px"
+      background: "rgba(15, 15, 35, 0.8)",
+      borderRadius: "20px",
+      padding: "32px",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+      marginBottom: "32px",
+      boxShadow: "0 16px 32px rgba(0, 0, 0, 0.3)",
+      backdropFilter: "blur(16px)"
     }}>
       <div style={{
         display: "flex",
@@ -159,12 +161,14 @@ export default function ProspectFilters({ onFiltersChange, totalProspects, filte
             onChange={(e) => handleFilterChange('view', e.target.value)}
             style={{
               width: "100%",
-              padding: "8px 12px",
-              background: "rgba(15, 23, 42, 0.8)",
+              padding: "12px 16px",
+              background: "rgba(10, 10, 25, 0.9)",
               border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "6px",
+              borderRadius: "12px",
               color: "#f1f5f9",
-              fontSize: "0.9rem"
+              fontSize: "0.9rem",
+              transition: "all 0.3s ease",
+              outline: "none"
             }}
           >
             {viewOptions.map(option => (

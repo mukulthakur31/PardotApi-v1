@@ -587,8 +587,8 @@ export default function Dashboard() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%)",
-      fontFamily: "'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif",
+      background: "linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)",
+      fontFamily: "'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif",
       display: "flex",
       flexDirection: "column"
     }}>
@@ -597,13 +597,14 @@ export default function Dashboard() {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "20px 40px",
-        background: "rgba(15, 23, 42, 0.9)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        padding: "24px 48px",
+        background: "rgba(15, 15, 35, 0.95)",
+        backdropFilter: "blur(24px)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         position: "sticky",
         top: 0,
-        zIndex: 100
+        zIndex: 100,
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
       }}>
         {/* Analytics Hub - Top Left */}
         <div style={{
@@ -766,15 +767,16 @@ export default function Dashboard() {
       }}>
         {/* Sidebar Navigation */}
         <div style={{
-          width: "280px",
-          background: "rgba(15, 23, 42, 0.8)",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "20px",
-          padding: "24px",
+          width: "320px",
+          background: "rgba(15, 15, 35, 0.9)",
+          backdropFilter: "blur(24px)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "24px",
+          padding: "32px",
           height: "fit-content",
           position: "sticky",
-          top: "120px"
+          top: "140px",
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)"
         }}>
           <h3 style={{
             color: "#f8fafc",
@@ -842,15 +844,16 @@ export default function Dashboard() {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          background: "rgba(15, 23, 42, 0.8)",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "20px",
-          padding: "32px",
+          background: "rgba(15, 15, 35, 0.9)",
+          backdropFilter: "blur(24px)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "24px",
+          padding: "40px",
           color: "#fff",
-          boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)",
           animation: "fadeIn 1.2s ease-out",
-          overflow: "auto"
+          overflow: "auto",
+          minHeight: "calc(100vh - 200px)"
         }}>
         {/* Custom Date Filter - Only for emails */}
         {activeTab === "emails" && (

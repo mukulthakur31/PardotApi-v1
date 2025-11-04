@@ -97,10 +97,12 @@ export default function FilteredProspectsTable({ prospects, isLoading }) {
 
   return (
     <div style={{
-      background: "rgba(30, 41, 59, 0.6)",
-      borderRadius: "16px",
-      padding: "24px",
-      border: "1px solid rgba(255, 255, 255, 0.05)"
+      background: "rgba(15, 15, 35, 0.8)",
+      borderRadius: "20px",
+      padding: "32px",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+      boxShadow: "0 16px 32px rgba(0, 0, 0, 0.3)",
+      backdropFilter: "blur(16px)"
     }}>
       <div style={{
         display: "flex",
@@ -126,16 +128,20 @@ export default function FilteredProspectsTable({ prospects, isLoading }) {
       {/* Table */}
       <div style={{
         overflowX: "auto",
-        background: "rgba(15, 23, 42, 0.8)",
-        borderRadius: "8px",
-        border: "1px solid rgba(255, 255, 255, 0.05)"
+        background: "rgba(10, 10, 25, 0.9)",
+        borderRadius: "16px",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        boxShadow: "inset 0 2px 8px rgba(0, 0, 0, 0.2)"
       }}>
         <table style={{
           width: "100%",
           borderCollapse: "collapse"
         }}>
           <thead>
-            <tr style={{ background: "rgba(30, 41, 59, 0.8)" }}>
+            <tr style={{ 
+              background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1))",
+              borderBottom: "2px solid rgba(59, 130, 246, 0.2)"
+            }}>
               <th style={{
                 padding: "12px 16px",
                 textAlign: "left",

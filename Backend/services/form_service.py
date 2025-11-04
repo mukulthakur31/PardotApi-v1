@@ -1,10 +1,10 @@
 import requests
-import json
-import os
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import datetime, timedelta
 from utils.auth_utils import get_credentials
+import json
+import os
 
 
 
@@ -153,8 +153,8 @@ def get_form_stats(access_token):
         
         print(f"Calculated stats for {len(form_stats)} forms")
         
-     
-
+        # Save all form stats to a single file
+        save_all_form_stats_to_file(form_stats)
         
         return form_stats
     except Exception as e:
@@ -164,6 +164,19 @@ def get_form_stats(access_token):
         raise e
 
 
+
+
+def save_all_form_stats_to_file(form_stats):
+    """Save all form stats to a single file"""
+    try:
+        filename = "form_stats.json"
+        
+        with open(filename, 'w') as f:
+            json.dump(form_stats, f, indent=2)
+        
+        print(f"Saved stats for {len(form_stats)} forms to {filename}")
+    except Exception as e:
+        print(f"Error saving form stats: {str(e)}")
 
 
 def get_form_abandonment_analysis(access_token):

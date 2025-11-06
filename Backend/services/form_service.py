@@ -3,13 +3,18 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import datetime, timedelta
 from utils.auth_utils import get_credentials
+import json
+import os
+
+
 
 def fetch_all_activities(headers):
     """Fetch all form activities"""
     all_activities = []
     limit = 200
+    offset = 0
     
-    for offset in range(0, 10000, limit):
+    while True:
         response = requests.get(
             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
             headers=headers,
@@ -27,6 +32,7 @@ def fetch_all_activities(headers):
             activities = data.get("result", {}).get("visitor_activity", [])
             if activities:
                 all_activities.extend(activities)
+                offset += limit
             else:
                 break
         else:
@@ -67,6 +73,7 @@ def calculate_form_stats(form, activities_by_form):
     return {
         "id": form_id,
         "name": form["name"],
+        "created_at": form.get("createdAt"),
         "views": total_views,
         "unique_views": get_unique_count(views),
         "submissions": total_submissions,
@@ -93,25 +100,41 @@ def get_form_stats(access_token):
         
         print(f"Fetching forms and activities with headers: {headers}")
         
+        def fetch_all_forms():
+            
+            all_forms = []
+            limit = 200
+            offset = 0
+            
+            while True:
+                response = requests.get(
+                    "https://pi.pardot.com/api/v5/objects/forms",
+                    headers=headers,
+                    params={"fields": "id,name,createdAt", "limit": limit, "offset": offset}
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    forms = data.get("values", [])
+                    if forms:
+                        all_forms.extend(forms)
+                        offset += limit
+                    else:
+                        break
+                else:
+                    print(f"Error fetching forms: {response.status_code} - {response.text}")
+                    break
+            return all_forms
+        
         with ThreadPoolExecutor(max_workers=2) as executor:
-            forms_future = executor.submit(
-                requests.get,
-                "https://pi.pardot.com/api/v5/objects/forms",
-                headers=headers,
-                params={"fields": "id,name", "limit": 200}
-            )
+            forms_future = executor.submit(fetch_all_forms)
             activities_future = executor.submit(fetch_all_activities, headers)
             
-            forms_response = forms_future.result()
+            forms = forms_future.result()
             activities = activities_future.result()
         
-        print(f"Forms response status: {forms_response.status_code}")
+        print(f"Forms count: {len(forms) if forms else 0}")
         print(f"Activities count: {len(activities) if activities else 0}")
-        
-        if forms_response.status_code != 200:
-            raise Exception(f"Error fetching forms: {forms_response.text}")
-        
-        forms = forms_response.json().get("values", [])
         print(f"Found {len(forms)} forms")
         
         # Group activities by form_id
@@ -129,6 +152,10 @@ def get_form_stats(access_token):
             form_stats = [future.result() for future in futures]
         
         print(f"Calculated stats for {len(form_stats)} forms")
+        
+        # Save all form stats to a single file
+        save_all_form_stats_to_file(form_stats)
+        
         return form_stats
     except Exception as e:
         print(f"Error in get_form_stats: {str(e)}")
@@ -137,6 +164,52 @@ def get_form_stats(access_token):
         raise e
 
 
+
+
+def save_all_form_stats_to_file(form_stats):
+    """Save all form stats to a single file"""
+    try:
+        filename = "form_stats.json"
+        
+        with open(filename, 'w') as f:
+            json.dump(form_stats, f, indent=2)
+        
+        print(f"Saved stats for {len(form_stats)} forms to {filename}")
+    except Exception as e:
+        print(f"Error saving form stats: {str(e)}")
+
+
+def get_filtered_form_stats(start_date=None, end_date=None):
+    """Get form stats from file with optional date filtering"""
+    try:
+        with open("form_stats.json", 'r') as f:
+            form_stats = json.load(f)
+        
+        if not start_date and not end_date:
+            return form_stats
+        
+        filtered_stats = []
+        for form in form_stats:
+            form_date = form.get("created_at")
+            if form_date:
+                # Parse form creation date
+                form_datetime = datetime.fromisoformat(form_date.replace('Z', '+00:00'))
+                form_date_only = form_datetime.date()
+                
+                # Apply date filters
+                if start_date and form_date_only < datetime.fromisoformat(start_date).date():
+                    continue
+                if end_date and form_date_only > datetime.fromisoformat(end_date).date():
+                    continue
+                    
+            filtered_stats.append(form)
+        
+        return filtered_stats
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        print(f"Error reading form stats: {str(e)}")
+        return []
 
 
 def get_form_abandonment_analysis(access_token):

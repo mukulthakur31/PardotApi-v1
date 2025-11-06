@@ -1,7 +1,46 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-export default function LandingPagesSection({ landingPageStats }) {
-  if (!landingPageStats) return null;
+// Configure axios to include credentials
+axios.defaults.withCredentials = true;
+
+function LandingPageStatsWithFilter({ landingPageStats }) {
+  const [filteredStats, setFilteredStats] = useState(landingPageStats);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const applyDateFilter = async () => {
+    if (!startDate && !endDate) {
+      setFilteredStats(landingPageStats);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
+      const response = await axios.get("http://localhost:4001/get-active-inactive-landing-pages", {
+        params
+      });
+      setFilteredStats(response.data);
+    } catch (error) {
+      console.error("Error filtering landing page stats:", error);
+      alert("Error applying filters. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setFilteredStats(landingPageStats);
+  };
+
+  if (!filteredStats) return null;
 
   return (
     <div style={{
@@ -14,14 +53,124 @@ export default function LandingPagesSection({ landingPageStats }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: "24px"
+        marginBottom: "24px",
+        flexWrap: "wrap",
+        gap: "16px"
       }}>
         <h2 style={{
           fontSize: "1.75rem",
           fontWeight: "700",
           margin: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
           color: "#f1f5f9"
-        }}>Landing Page Activity Analysis (3 Months)</h2>
+        }}>
+          Landing Page Activity Analysis
+          <span style={{
+            background: "linear-gradient(135deg, #475569, #334155)",
+            color: "#ffffff",
+            padding: "6px 12px",
+            borderRadius: "8px",
+            fontSize: "0.875rem",
+            fontWeight: "600"
+          }}>
+            {(filteredStats.active_pages?.count || 0) + (filteredStats.inactive_pages?.count || 0)} pages
+          </span>
+        </h2>
+      </div>
+
+      <div style={{
+        background: "rgba(15, 23, 42, 0.8)",
+        borderRadius: "12px",
+        padding: "20px",
+        marginBottom: "24px",
+        border: "1px solid rgba(255, 255, 255, 0.05)"
+      }}>
+        <h3 style={{
+          color: "#f1f5f9",
+          fontSize: "1.1rem",
+          fontWeight: "600",
+          marginBottom: "16px",
+          margin: 0
+        }}>📅 Filter by Creation Date</h3>
+        
+        <div style={{
+          display: "flex",
+          gap: "16px",
+          alignItems: "center",
+          flexWrap: "wrap",
+          marginTop: "16px"
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(30, 41, 59, 0.8)",
+                color: "#f1f5f9",
+                fontSize: "0.9rem"
+              }}
+            />
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(30, 41, 59, 0.8)",
+                color: "#f1f5f9",
+                fontSize: "0.9rem"
+              }}
+            />
+          </div>
+          
+          <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
+            <button
+              onClick={applyDateFilter}
+              disabled={loading}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: loading ? "rgba(99, 102, 241, 0.5)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                color: "#ffffff",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: "600",
+                fontSize: "0.9rem"
+              }}
+            >
+              {loading ? "Filtering..." : "Apply Filter"}
+            </button>
+            
+            <button
+              onClick={clearFilters}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid rgba(239, 68, 68, 0.5)",
+                background: "rgba(239, 68, 68, 0.1)",
+                color: "#ef4444",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "0.9rem"
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
       </div>
       
       {/* Criteria Banner */}
@@ -35,7 +184,7 @@ export default function LandingPagesSection({ landingPageStats }) {
       }}>
         <h3 style={{ color: "#3b82f6", margin: "0 0 8px 0", fontSize: "1.1rem" }}>📊 Activity Criteria</h3>
         <div style={{ color: "#e2e8f0", fontSize: "1rem", fontWeight: "500" }}>
-          {landingPageStats.criteria}
+          {filteredStats.criteria || "Landing pages with visitor activity (views, clicks, submissions) in last 3 months are considered active"}
         </div>
       </div>
       
@@ -55,10 +204,10 @@ export default function LandingPagesSection({ landingPageStats }) {
         }}>
           <h3 style={{ color: "#22c55e", margin: "0 0 8px 0", fontSize: "1rem" }}>Active Pages</h3>
           <div style={{ fontSize: "2rem", fontWeight: "700", color: "#22c55e" }}>
-            {landingPageStats.active_pages.count}
+            {filteredStats.active_pages?.count || 0}
           </div>
           <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
-            {landingPageStats.summary.active_percentage}% of total
+            {filteredStats.summary?.active_percentage || 0}% of total
           </div>
         </div>
         
@@ -71,10 +220,10 @@ export default function LandingPagesSection({ landingPageStats }) {
         }}>
           <h3 style={{ color: "#ef4444", margin: "0 0 8px 0", fontSize: "1rem" }}>Inactive Pages</h3>
           <div style={{ fontSize: "2rem", fontWeight: "700", color: "#ef4444" }}>
-            {landingPageStats.inactive_pages.count}
+            {filteredStats.inactive_pages?.count || 0}
           </div>
           <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
-            {landingPageStats.summary.inactive_percentage}% of total
+            {filteredStats.summary?.inactive_percentage || 0}% of total
           </div>
         </div>
         
@@ -87,10 +236,10 @@ export default function LandingPagesSection({ landingPageStats }) {
         }}>
           <h3 style={{ color: "#6366f1", margin: "0 0 8px 0", fontSize: "1rem" }}>Total Activities</h3>
           <div style={{ fontSize: "2rem", fontWeight: "700", color: "#6366f1" }}>
-            {landingPageStats.summary.total_activities}
+            {filteredStats.summary?.total_activities || 0}
           </div>
           <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
-            Recent: {landingPageStats.summary.total_recent_activities}
+            Recent: {filteredStats.summary?.total_recent_activities || 0}
           </div>
         </div>
       </div>
@@ -110,10 +259,10 @@ export default function LandingPagesSection({ landingPageStats }) {
         }}>
           <h4 style={{ color: "#22c55e", margin: "0 0 16px 0" }}>✅ Active Pages</h4>
           <div style={{ color: "#94a3b8", marginBottom: "12px", fontSize: "0.9rem" }}>
-            {landingPageStats.active_pages.description}
+            {filteredStats.active_pages?.description || "Pages with visitor activity in the last 3 months"}
           </div>
           <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-            {landingPageStats.active_pages.pages.map((page, index) => (
+            {(filteredStats.active_pages?.pages || []).map((page, index) => (
               <div key={index} style={{
                 background: "rgba(34, 197, 94, 0.1)",
                 padding: "12px",
@@ -149,10 +298,10 @@ export default function LandingPagesSection({ landingPageStats }) {
         }}>
           <h4 style={{ color: "#ef4444", margin: "0 0 16px 0" }}>⚠️ Inactive Pages</h4>
           <div style={{ color: "#94a3b8", marginBottom: "12px", fontSize: "0.9rem" }}>
-            {landingPageStats.inactive_pages.description}
+            {filteredStats.inactive_pages?.description || "Pages with no visitor activity in the last 3 months"}
           </div>
           <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-            {landingPageStats.inactive_pages.pages.map((page, index) => (
+            {(filteredStats.inactive_pages?.pages || []).map((page, index) => (
               <div key={index} style={{
                 background: "rgba(239, 68, 68, 0.1)",
                 padding: "12px",
@@ -184,5 +333,13 @@ export default function LandingPagesSection({ landingPageStats }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LandingPagesSection({ landingPageStats }) {
+  if (!landingPageStats) return null;
+
+  return (
+    <LandingPageStatsWithFilter landingPageStats={landingPageStats} />
   );
 }

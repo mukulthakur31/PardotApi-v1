@@ -11,7 +11,7 @@ import os
 def fetch_all_activities(headers):
     """Fetch all form activities"""
     all_activities = []
-    limit = 200
+    limit = 1000
     offset = 0
     
     while True:

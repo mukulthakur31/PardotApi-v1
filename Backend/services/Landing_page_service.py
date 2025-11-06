@@ -3,13 +3,16 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import datetime, timedelta
 from utils.auth_utils import get_credentials
+import json
+import os
 
 def fetch_all_activities(headers):
     """Fetch all visitor activities"""
     all_activities = []
     limit = 200
+    offset=0
     
-    for offset in range(0, 10000, limit):
+    while True:
         response = requests.get(
             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
             headers=headers,
@@ -27,6 +30,7 @@ def fetch_all_activities(headers):
             activities = data.get("result", {}).get("visitor_activity", [])
             if activities:
                 all_activities.extend(activities)
+                offset += limit
             else:
                 break
         else:
@@ -54,6 +58,7 @@ def calculate_landing_page_stats(page, activities_by_page):
     return {
         "id": page_id,
         "name": page["name"],
+        "created_at": page.get("createdAt"),
         "url": page.get("url") or page.get("vanityUrl") or "No URL",
         "form_id": page.get("formId"),
         "views": len(views),
@@ -81,7 +86,7 @@ def get_landing_page_stats(access_token):
                 requests.get,
                 "https://pi.pardot.com/api/v5/objects/landing-pages",
                 headers=headers,
-                params={"fields": "id,name,url,vanityUrl,formId,isDeleted", "limit": 200}
+                params={"fields": "id,name,url,vanityUrl,formId,isDeleted,createdAt", "limit": 200}
             )
             activities_future = executor.submit(fetch_all_activities, headers)
             
@@ -109,6 +114,9 @@ def get_landing_page_stats(access_token):
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(calculate_landing_page_stats, page, activities_by_page) for page in pages]
             page_stats = [future.result() for future in futures]
+        
+        # Save all landing page stats to file
+        save_all_landing_page_stats_to_file(page_stats)
         
         # Categorize pages as active/inactive
         active_pages = [page for page in page_stats if page["is_active"]]
@@ -139,3 +147,82 @@ def get_landing_page_stats(access_token):
         print(f"Error in get_landing_page_stats: {str(e)}")
         raise e
 
+
+
+def save_all_landing_page_stats_to_file(page_stats):
+    """Save all landing page stats to a single file"""
+    try:
+        filename = "landing_page_stats.json"
+        
+        with open(filename, 'w') as f:
+            json.dump(page_stats, f, indent=2)
+        
+        print(f"Saved stats for {len(page_stats)} landing pages to {filename}")
+    except Exception as e:
+        print(f"Error saving landing page stats: {str(e)}")
+
+
+def get_filtered_landing_page_stats(start_date=None, end_date=None):
+    """Get landing page stats from file with optional date filtering"""
+    try:
+        with open("landing_page_stats.json", 'r') as f:
+            page_stats = json.load(f)
+        
+        if not start_date and not end_date:
+            return page_stats
+        
+        filtered_stats = []
+        for page in page_stats:
+            page_date = page.get("created_at")
+            if page_date:
+                # Parse page creation date
+                page_datetime = datetime.fromisoformat(page_date.replace('Z', '+00:00'))
+                page_date_only = page_datetime.date()
+                
+                # Apply date filters
+                if start_date and page_date_only < datetime.fromisoformat(start_date).date():
+                    continue
+                if end_date and page_date_only > datetime.fromisoformat(end_date).date():
+                    continue
+                    
+            filtered_stats.append(page)
+        
+        return filtered_stats
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        print(f"Error reading landing page stats: {str(e)}")
+        return []
+
+
+def get_active_inactive_landing_pages_from_cache(start_date=None, end_date=None):
+    """Get active/inactive landing pages using cached stats with optional date filtering"""
+    try:
+        page_stats = get_filtered_landing_page_stats(start_date, end_date)
+        
+        active_pages = [page for page in page_stats if page["is_active"]]
+        inactive_pages = [page for page in page_stats if not page["is_active"]]
+        
+        return {
+            "criteria": "Landing pages with visitor activity (views, clicks, submissions) in last 3 months are considered active",
+            "active_pages": {
+                "count": len(active_pages),
+                "description": "Pages with visitor activity in the last 3 months",
+                "pages": active_pages
+            },
+            "inactive_pages": {
+                "count": len(inactive_pages),
+                "description": "Pages with no visitor activity in the last 3 months",
+                "pages": inactive_pages
+            },
+            "summary": {
+                "total_pages": len(page_stats),
+                "active_percentage": round((len(active_pages) / len(page_stats) * 100), 2) if page_stats else 0,
+                "inactive_percentage": round((len(inactive_pages) / len(page_stats) * 100), 2) if page_stats else 0,
+                "total_activities": sum(p["total_activities"] for p in page_stats),
+                "total_recent_activities": sum(p["recent_activities"] for p in active_pages)
+            }
+        }
+    except Exception as e:
+        print(f"Error in get_active_inactive_landing_pages_from_cache: {str(e)}")
+        raise e

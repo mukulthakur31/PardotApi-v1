@@ -8,10 +8,44 @@ import os
 
 
 
+# def fetch_all_activities(headers):
+#     """Fetch all form activities"""
+#     all_activities = []
+#     limit = 1000
+#     offset = 0
+    
+#     while True:
+#         response = requests.get(
+#             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
+#             headers=headers,
+#             params={
+#                 "format": "json",
+#                 "limit": limit,
+#                 "offset": offset,
+#                 "sort_by": "created_at",
+#                 "sort_order": "descending"
+#             }
+#         )
+        
+#         if response.status_code == 200:
+#             data = response.json()
+#             activities = data.get("result", {}).get("visitor_activity", [])
+#             if activities:
+#                 all_activities.extend(activities)
+#                 offset += limit
+#             else:
+#                 break
+#         else:
+#             print(f"Error fetching activities: {response.status_code} - {response.text}")
+#             break
+    
+#     return all_activities
+
+
 def fetch_all_activities(headers):
     """Fetch all form activities"""
     all_activities = []
-    limit = 1000
+    limit = 200
     offset = 0
     
     while True:

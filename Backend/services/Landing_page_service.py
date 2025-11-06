@@ -7,10 +7,10 @@ import json
 import os
 
 def fetch_all_activities(headers):
-    """Fetch all visitor activities"""
+    """Fetch all form activities"""
     all_activities = []
-    limit = 200
-    offset=0
+    limit = 200  # Use smaller limit that works reliably
+    offset = 0
     
     while True:
         response = requests.get(
@@ -31,6 +31,7 @@ def fetch_all_activities(headers):
             if activities:
                 all_activities.extend(activities)
                 offset += limit
+                print(f"Fetched {len(activities)} activities, total: {len(all_activities)}")
             else:
                 break
         else:

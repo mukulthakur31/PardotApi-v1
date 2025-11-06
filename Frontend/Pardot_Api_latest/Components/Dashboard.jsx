@@ -55,6 +55,27 @@ const styles = `
   0% { background-position: -200px 0; }
   100% { background-position: calc(200px + 100%) 0; }
 }
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+/* Prevent content jumping during loading */
+.content-container {
+  min-height: 400px;
+  position: relative;
+}
 `;
 
 // Inject styles
@@ -840,7 +861,7 @@ export default function Dashboard() {
         </div>
 
         {/* Content Area */}
-        <div style={{
+        <div className="content-container" style={{
           flex: 1,
           background: "rgba(15, 23, 42, 0.8)",
           backdropFilter: "blur(20px)",
@@ -850,7 +871,11 @@ export default function Dashboard() {
           color: "#fff",
           boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
           animation: "fadeIn 1.2s ease-out",
-          overflow: "auto"
+          overflow: "hidden",
+          overflowY: "auto",
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255, 255, 255, 0.3) transparent",
+          minHeight: "calc(100vh - 200px)"
         }}>
         {/* Custom Date Filter - Only for emails */}
         {activeTab === "emails" && (
@@ -899,19 +924,24 @@ export default function Dashboard() {
             background: "rgba(30, 41, 59, 0.6)",
             borderRadius: "16px",
             border: "1px solid rgba(255, 255, 255, 0.05)",
-            marginBottom: "32px"
+            marginBottom: "32px",
+            position: "relative",
+            overflow: "hidden"
           }}>
             <div style={{ 
-              fontSize: "3rem", 
-              marginBottom: "16px",
+              width: "40px",
+              height: "40px",
+              border: "4px solid rgba(255, 255, 255, 0.1)",
+              borderTop: "4px solid #6366f1",
+              borderRadius: "50%",
+              margin: "0 auto 16px",
               animation: "spin 1s linear infinite"
             }}></div>
             <p style={{ 
               color: "#cbd5e1", 
               fontWeight: "600", 
               margin: 0,
-              fontSize: "1.1rem",
-              animation: "pulse 1.5s ease-in-out infinite"
+              fontSize: "1.1rem"
             }}>Processing your request...</p>
           </div>
         )}

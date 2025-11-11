@@ -18,7 +18,8 @@ def fetch_all_activities(headers):
                 "limit": limit,
                 "offset": offset,
                 "sort_by": "created_at",
-                "sort_order": "descending"
+                "sort_order": "descending",
+                "form_only": "true"
             }
         )
         

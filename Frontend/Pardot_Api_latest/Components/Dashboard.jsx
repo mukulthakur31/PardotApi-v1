@@ -195,7 +195,10 @@ export default function Dashboard() {
   const getTokenFromSession = async () => {
     try {
       const response = await axios.get("http://localhost:4001/get-token");
-      setToken(response.data.token);
+      const accessToken = response.data.token;
+      setToken(accessToken);
+      // Store token in localStorage for use by components
+      localStorage.setItem('access_token', accessToken);
     } catch (err) {
       console.error("Error getting token:", err);
       // Redirect to setup if no token found

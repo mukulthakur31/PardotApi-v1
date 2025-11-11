@@ -6,23 +6,32 @@ from utils.auth_utils import get_credentials
 import json
 import os
 
-def fetch_all_activities(headers):
-    """Fetch all form activities"""
+def fetch_all_activities(headers, created_after=None, created_before=None):
+    """Fetch all landing page activities with optional date filtering"""
     all_activities = []
-    limit = 200  # Use smaller limit that works reliably
+    limit = 200
     offset = 0
     
     while True:
+        params = {
+            "format": "json",
+            "limit": limit,
+            "offset": offset,
+            "sort_by": "created_at",
+            "sort_order": "descending",
+            "landing_page_only": "true"
+        }
+        
+        # Add date filters if provided
+        if created_after:
+            params["created_after"] = created_after
+        if created_before:
+            params["created_before"] = created_before
+        
         response = requests.get(
             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
             headers=headers,
-            params={
-                "format": "json",
-                "limit": limit,
-                "offset": offset,
-                "sort_by": "created_at",
-                "sort_order": "descending"
-            }
+            params=params
         )
         
         if response.status_code == 200:
@@ -31,7 +40,6 @@ def fetch_all_activities(headers):
             if activities:
                 all_activities.extend(activities)
                 offset += limit
-                print(f"Fetched {len(activities)} activities, total: {len(all_activities)}")
             else:
                 break
         else:
@@ -71,8 +79,8 @@ def calculate_landing_page_stats(page, activities_by_page):
         "last_activity": max([a.get("created_at") for a in page_activities], default=None) if page_activities else None
     }
 
-def get_landing_page_stats(access_token):
-    """Get landing page statistics based on visitor activity (last 3 months)"""
+def get_landing_page_stats(access_token, created_after=None, created_before=None):
+    """Get landing page statistics with optional date filtering"""
     try:
         credentials = get_credentials()
         headers = {
@@ -89,7 +97,7 @@ def get_landing_page_stats(access_token):
                 headers=headers,
                 params={"fields": "id,name,url,vanityUrl,formId,isDeleted,createdAt", "limit": 200}
             )
-            activities_future = executor.submit(fetch_all_activities, headers)
+            activities_future = executor.submit(fetch_all_activities, headers, created_after, created_before)
             
             pages_response = pages_future.result()
             activities = activities_future.result()
@@ -116,8 +124,9 @@ def get_landing_page_stats(access_token):
             futures = [executor.submit(calculate_landing_page_stats, page, activities_by_page) for page in pages]
             page_stats = [future.result() for future in futures]
         
-        # Save all landing page stats to file
-        save_all_landing_page_stats_to_file(page_stats)
+        # Filter out pages with no activities if date filters are applied
+        if created_after or created_before:
+            page_stats = [page for page in page_stats if page["views"] > 0 or page["submissions"] > 0 or page["clicks"] > 0]
         
         # Categorize pages as active/inactive
         active_pages = [page for page in page_stats if page["is_active"]]
@@ -163,67 +172,57 @@ def save_all_landing_page_stats_to_file(page_stats):
         print(f"Error saving landing page stats: {str(e)}")
 
 
-def get_filtered_landing_page_stats(start_date=None, end_date=None):
-    """Get landing page stats from file with optional date filtering"""
-    try:
-        with open("landing_page_stats.json", 'r') as f:
-            page_stats = json.load(f)
-        
-        if not start_date and not end_date:
-            return page_stats
-        
-        filtered_stats = []
-        for page in page_stats:
-            page_date = page.get("created_at")
-            if page_date:
-                # Parse page creation date
-                page_datetime = datetime.fromisoformat(page_date.replace('Z', '+00:00'))
-                page_date_only = page_datetime.date()
-                
-                # Apply date filters
-                if start_date and page_date_only < datetime.fromisoformat(start_date).date():
-                    continue
-                if end_date and page_date_only > datetime.fromisoformat(end_date).date():
-                    continue
-                    
-            filtered_stats.append(page)
-        
-        return filtered_stats
-    except FileNotFoundError:
-        return []
-    except Exception as e:
-        print(f"Error reading landing page stats: {str(e)}")
-        return []
+def get_date_range_from_filter(filter_type):
+    """Convert filter type to date range"""
+    from datetime import datetime, timedelta
+    
+    now = datetime.now()
+    
+    if filter_type == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "yesterday":
+        yesterday = now - timedelta(days=1)
+        start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+    elif filter_type == "last_7_days":
+        start = now - timedelta(days=7)
+        end = now
+    elif filter_type == "last_30_days":
+        start = now - timedelta(days=30)
+        end = now
+    elif filter_type == "this_month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "last_month":
+        if now.month == 1:
+            start = now.replace(year=now.year-1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+        else:
+            start = now.replace(month=now.month-1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+    elif filter_type == "this_quarter":
+        quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+        start = now.replace(month=quarter_start_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "this_year":
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    else:
+        return None, None
+    
+    return start.isoformat(), end.isoformat()
 
 
-def get_active_inactive_landing_pages_from_cache(start_date=None, end_date=None):
-    """Get active/inactive landing pages using cached stats with optional date filtering"""
+def get_filtered_landing_page_stats(access_token, filter_type=None, start_date=None, end_date=None):
+    """Get filtered landing page stats with date filtering"""
     try:
-        page_stats = get_filtered_landing_page_stats(start_date, end_date)
+        # Convert filter type to date range if provided
+        if filter_type and not start_date and not end_date:
+            start_date, end_date = get_date_range_from_filter(filter_type)
         
-        active_pages = [page for page in page_stats if page["is_active"]]
-        inactive_pages = [page for page in page_stats if not page["is_active"]]
-        
-        return {
-            "criteria": "Landing pages with visitor activity (views, clicks, submissions) in last 3 months are considered active",
-            "active_pages": {
-                "count": len(active_pages),
-                "description": "Pages with visitor activity in the last 3 months",
-                "pages": active_pages
-            },
-            "inactive_pages": {
-                "count": len(inactive_pages),
-                "description": "Pages with no visitor activity in the last 3 months",
-                "pages": inactive_pages
-            },
-            "summary": {
-                "total_pages": len(page_stats),
-                "active_percentage": round((len(active_pages) / len(page_stats) * 100), 2) if page_stats else 0,
-                "inactive_percentage": round((len(inactive_pages) / len(page_stats) * 100), 2) if page_stats else 0,
-                "total_activities": sum(p["total_activities"] for p in page_stats),
-                "total_recent_activities": sum(p["recent_activities"] for p in active_pages)
-            }
-        }
+        # Fetch fresh data with date filters
+        return get_landing_page_stats(access_token, start_date, end_date)
     except Exception as e:
-        print(f"Error in get_active_inactive_landing_pages_from_cache: {str(e)}")
+        print(f"Error in get_filtered_landing_page_stats: {str(e)}")
         raise e

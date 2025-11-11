@@ -8,57 +8,32 @@ import os
 
 
 
-# def fetch_all_activities(headers):
-#     """Fetch all form activities"""
-#     all_activities = []
-#     limit = 1000
-#     offset = 0
-    
-#     while True:
-#         response = requests.get(
-#             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
-#             headers=headers,
-#             params={
-#                 "format": "json",
-#                 "limit": limit,
-#                 "offset": offset,
-#                 "sort_by": "created_at",
-#                 "sort_order": "descending"
-#             }
-#         )
-        
-#         if response.status_code == 200:
-#             data = response.json()
-#             activities = data.get("result", {}).get("visitor_activity", [])
-#             if activities:
-#                 all_activities.extend(activities)
-#                 offset += limit
-#             else:
-#                 break
-#         else:
-#             print(f"Error fetching activities: {response.status_code} - {response.text}")
-#             break
-    
-#     return all_activities
-
-
-def fetch_all_activities(headers):
-    """Fetch all form activities"""
+def fetch_all_activities(headers, created_after=None, created_before=None):
+    """Fetch all form activities with optional date filtering"""
     all_activities = []
     limit = 200
     offset = 0
     
     while True:
+        params = {
+            "format": "json",
+            "limit": limit,
+            "offset": offset,
+            "sort_by": "created_at",
+            "sort_order": "descending",
+            "form_only": "true"
+        }
+        
+        # Add date filters if provided
+        if created_after:
+            params["created_after"] = created_after
+        if created_before:
+            params["created_before"] = created_before
+        
         response = requests.get(
             "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
             headers=headers,
-            params={
-                "format": "json",
-                "limit": limit,
-                "offset": offset,
-                "sort_by": "created_at",
-                "sort_order": "descending"
-            }
+            params=params
         )
         
         if response.status_code == 200:
@@ -74,8 +49,6 @@ def fetch_all_activities(headers):
             break
     
     return all_activities
-
-
 
 
 def calculate_form_stats(form, activities_by_form):
@@ -123,8 +96,8 @@ def calculate_form_stats(form, activities_by_form):
     }
 
 
-def get_form_stats(access_token):
-    """Main function to get form statistics"""
+def get_form_stats(access_token, created_after=None, created_before=None):
+    """Main function to get form statistics with optional date filtering"""
     try:
         credentials = get_credentials()
         headers = {
@@ -135,7 +108,6 @@ def get_form_stats(access_token):
         print(f"Fetching forms and activities with headers: {headers}")
         
         def fetch_all_forms():
-            
             all_forms = []
             limit = 200
             offset = 0
@@ -162,7 +134,7 @@ def get_form_stats(access_token):
         
         with ThreadPoolExecutor(max_workers=2) as executor:
             forms_future = executor.submit(fetch_all_forms)
-            activities_future = executor.submit(fetch_all_activities, headers)
+            activities_future = executor.submit(fetch_all_activities, headers, created_after, created_before)
             
             forms = forms_future.result()
             activities = activities_future.result()
@@ -185,10 +157,11 @@ def get_form_stats(access_token):
             futures = [executor.submit(calculate_form_stats, form, activities_by_form) for form in forms]
             form_stats = [future.result() for future in futures]
         
-        print(f"Calculated stats for {len(form_stats)} forms")
+        # Filter out forms with no activities if date filters are applied
+        if created_after or created_before:
+            form_stats = [form for form in form_stats if form["views"] > 0 or form["submissions"] > 0 or form["clicks"] > 0]
         
-        # Save all form stats to a single file
-        save_all_form_stats_to_file(form_stats)
+        print(f"Calculated stats for {len(form_stats)} forms")
         
         return form_stats
     except Exception as e:
@@ -200,56 +173,52 @@ def get_form_stats(access_token):
 
 
 
-def save_all_form_stats_to_file(form_stats):
-    """Save all form stats to a single file"""
-    try:
-        filename = "form_stats.json"
-        
-        with open(filename, 'w') as f:
-            json.dump(form_stats, f, indent=2)
-        
-        print(f"Saved stats for {len(form_stats)} forms to {filename}")
-    except Exception as e:
-        print(f"Error saving form stats: {str(e)}")
+def get_date_range_from_filter(filter_type):
+    """Convert filter type to date range"""
+    from datetime import datetime, timedelta
+    
+    now = datetime.now()
+    
+    if filter_type == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "yesterday":
+        yesterday = now - timedelta(days=1)
+        start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+    elif filter_type == "last_7_days":
+        start = now - timedelta(days=7)
+        end = now
+    elif filter_type == "last_30_days":
+        start = now - timedelta(days=30)
+        end = now
+    elif filter_type == "this_month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "last_month":
+        if now.month == 1:
+            start = now.replace(year=now.year-1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+        else:
+            start = now.replace(month=now.month-1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+    elif filter_type == "this_quarter":
+        quarter_start_month = ((now.month - 1) // 3) * 3 + 1
+        start = now.replace(month=quarter_start_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif filter_type == "this_year":
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    else:
+        return None, None
+    
+    return start.isoformat(), end.isoformat()
 
 
-def get_filtered_form_stats(start_date=None, end_date=None):
-    """Get form stats from file with optional date filtering"""
-    try:
-        with open("form_stats.json", 'r') as f:
-            form_stats = json.load(f)
-        
-        if not start_date and not end_date:
-            return form_stats
-        
-        filtered_stats = []
-        for form in form_stats:
-            form_date = form.get("created_at")
-            if form_date:
-                # Parse form creation date
-                form_datetime = datetime.fromisoformat(form_date.replace('Z', '+00:00'))
-                form_date_only = form_datetime.date()
-                
-                # Apply date filters
-                if start_date and form_date_only < datetime.fromisoformat(start_date).date():
-                    continue
-                if end_date and form_date_only > datetime.fromisoformat(end_date).date():
-                    continue
-                    
-            filtered_stats.append(form)
-        
-        return filtered_stats
-    except FileNotFoundError:
-        return []
-    except Exception as e:
-        print(f"Error reading form stats: {str(e)}")
-        return []
-
-
-def get_form_abandonment_analysis(access_token):
+def get_form_abandonment_analysis(access_token, created_after=None, created_before=None):
     """Analyze form abandonment patterns and issues"""
     try:
-        form_stats = get_form_stats(access_token)
+        form_stats = get_form_stats(access_token, created_after, created_before)
         return get_form_abandonment_analysis_from_cache(form_stats)
     except Exception as e:
         print(f"Error in get_form_abandonment_analysis: {str(e)}")

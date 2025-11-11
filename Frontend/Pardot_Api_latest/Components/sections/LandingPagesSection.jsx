@@ -8,22 +8,52 @@ function LandingPageStatsWithFilter({ landingPageStats }) {
   const [filteredStats, setFilteredStats] = useState(landingPageStats);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [filterType, setFilterType] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const predefinedFilters = [
+    { value: "today", label: "Today" },
+    { value: "yesterday", label: "Yesterday" },
+    { value: "last_7_days", label: "Last 7 Days" },
+    { value: "last_30_days", label: "Last 30 Days" },
+    { value: "this_month", label: "This Month" },
+    { value: "last_month", label: "Last Month" },
+    { value: "this_quarter", label: "This Quarter" },
+    { value: "this_year", label: "This Year" }
+  ];
+
+  const handleFilterTypeChange = (value) => {
+    setFilterType(value);
+    // Clear custom dates when switching away from custom
+    if (value !== "custom" && value !== "") {
+      setStartDate("");
+      setEndDate("");
+    }
+  };
+
   const applyDateFilter = async () => {
-    if (!startDate && !endDate) {
+    if (!filterType && !startDate && !endDate) {
       setFilteredStats(landingPageStats);
       return;
     }
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('access_token');
       const params = {};
-      if (startDate) params.start_date = startDate;
-      if (endDate) params.end_date = endDate;
+      
+      if (filterType) {
+        params.filter_type = filterType;
+      } else {
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+      }
 
-      const response = await axios.get("http://localhost:4001/get-active-inactive-landing-pages", {
-        params
+      const response = await axios.get("http://localhost:4001/get-filtered-landing-page-stats", {
+        params,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       setFilteredStats(response.data);
     } catch (error) {
@@ -37,6 +67,7 @@ function LandingPageStatsWithFilter({ landingPageStats }) {
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
+    setFilterType("");
     setFilteredStats(landingPageStats);
   };
 
@@ -81,94 +112,177 @@ function LandingPageStatsWithFilter({ landingPageStats }) {
       </div>
 
       <div style={{
-        background: "rgba(15, 23, 42, 0.8)",
+        background: "rgba(30, 41, 59, 0.6)",
         borderRadius: "12px",
         padding: "20px",
         marginBottom: "24px",
         border: "1px solid rgba(255, 255, 255, 0.05)"
       }}>
-        <h3 style={{
-          color: "#f1f5f9",
-          fontSize: "1.1rem",
-          fontWeight: "600",
-          marginBottom: "16px",
-          margin: 0
-        }}>📅 Filter by Creation Date</h3>
-        
         <div style={{
           display: "flex",
-          gap: "16px",
           alignItems: "center",
-          flexWrap: "wrap",
-          marginTop: "16px"
+          gap: "20px",
+          flexWrap: "wrap"
         }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+          {/* Filter Type Dropdown */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <label style={{ 
+              fontSize: "0.9rem", 
+              fontWeight: "600", 
+              color: "#cbd5e1",
+              whiteSpace: "nowrap"
+            }}>
+              📅 Activity Filter:
+            </label>
+            <select
+              value={filterType}
+              onChange={(e) => handleFilterTypeChange(e.target.value)}
               style={{
-                padding: "8px 12px",
+                padding: "12px 16px",
                 borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                background: "rgba(30, 41, 59, 0.8)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                outline: "none",
+                fontSize: "1rem",
+                fontWeight: "500",
+                background: "rgba(51, 65, 85, 0.8)",
                 color: "#f1f5f9",
-                fontSize: "0.9rem"
-              }}
-            />
-          </div>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ color: "#94a3b8", fontSize: "0.9rem", fontWeight: "500" }}>End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                background: "rgba(30, 41, 59, 0.8)",
-                color: "#f1f5f9",
-                fontSize: "0.9rem"
-              }}
-            />
-          </div>
-          
-          <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
-            <button
-              onClick={applyDateFilter}
-              disabled={loading}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "none",
-                background: loading ? "rgba(99, 102, 241, 0.5)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
-                color: "#ffffff",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontWeight: "600",
-                fontSize: "0.9rem"
+                transition: "all 0.3s ease",
+                cursor: "pointer",
+                minWidth: "180px"
               }}
             >
-              {loading ? "Filtering..." : "Apply Filter"}
-            </button>
-            
+              <option value="">Select Filter</option>
+              {predefinedFilters.map((filter) => (
+                <option key={filter.value} value={filter.value}>
+                  {filter.label}
+                </option>
+              ))}
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+
+          {/* Custom Date Range - Only show when custom is selected */}
+          {(filterType === "custom" || (!filterType && (startDate || endDate))) && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <label style={{ 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500", 
+                  color: "#cbd5e1",
+                  whiteSpace: "nowrap"
+                }}>
+                  From:
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (e.target.value) setFilterType("custom");
+                  }}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    outline: "none",
+                    fontSize: "1rem",
+                    fontWeight: "500",
+                    background: "rgba(51, 65, 85, 0.8)",
+                    color: "#f1f5f9",
+                    transition: "all 0.3s ease",
+                    width: "140px"
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <label style={{ 
+                  fontSize: "0.85rem", 
+                  fontWeight: "500", 
+                  color: "#cbd5e1",
+                  whiteSpace: "nowrap"
+                }}>
+                  To:
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    if (e.target.value) setFilterType("custom");
+                  }}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    outline: "none",
+                    fontSize: "1rem",
+                    fontWeight: "500",
+                    background: "rgba(51, 65, 85, 0.8)",
+                    color: "#f1f5f9",
+                    transition: "all 0.3s ease",
+                    width: "140px"
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Apply Button */}
+          <button
+            onClick={applyDateFilter}
+            disabled={loading || (!filterType && !startDate && !endDate)}
+            style={{
+              padding: "12px 24px",
+              borderRadius: "8px",
+              border: "none",
+              background: loading || (!filterType && !startDate && !endDate) 
+                ? "rgba(99, 102, 241, 0.3)" 
+                : "linear-gradient(135deg, #6366f1, #4f46e5)",
+              color: "#ffffff",
+              cursor: loading || (!filterType && !startDate && !endDate) ? "not-allowed" : "pointer",
+              fontWeight: "600",
+              fontSize: "0.9rem",
+              whiteSpace: "nowrap",
+              transition: "all 0.3s ease"
+            }}
+          >
+            {loading ? "Filtering..." : "Apply Filter"}
+          </button>
+          
+          {(filterType || startDate || endDate) && (
             <button
               onClick={clearFilters}
               style={{
-                padding: "8px 16px",
+                padding: "12px 20px",
                 borderRadius: "8px",
                 border: "1px solid rgba(239, 68, 68, 0.5)",
                 background: "rgba(239, 68, 68, 0.1)",
                 color: "#ef4444",
                 cursor: "pointer",
                 fontWeight: "600",
-                fontSize: "0.9rem"
+                fontSize: "0.9rem",
+                whiteSpace: "nowrap",
+                transition: "all 0.3s ease"
               }}
             >
               Clear
             </button>
+          )}
+
+          {/* Instruction Message */}
+          <div style={{
+            background: "rgba(16, 185, 129, 0.1)",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+            borderRadius: "8px",
+            padding: "8px 12px",
+            color: "#6ee7b7",
+            fontSize: "0.8rem",
+            fontWeight: "500",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px"
+          }}>
+            💡 Shows only pages with activities in selected period
           </div>
         </div>
       </div>

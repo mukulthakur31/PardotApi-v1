@@ -10,8 +10,8 @@ from utils.auth_utils import get_credentials, extract_access_token
 
 # Import services
 from services.email_service import get_email_stats
-from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache, get_filtered_form_stats
-from services.Landing_page_service import get_landing_page_stats, get_filtered_landing_page_stats, get_active_inactive_landing_pages_from_cache
+from services.form_service import get_form_stats, get_active_inactive_forms, get_form_abandonment_analysis, get_active_inactive_forms_from_cache, get_form_abandonment_analysis_from_cache
+from services.Landing_page_service import get_landing_page_stats, get_filtered_landing_page_stats
 from services.prospect_service import get_prospect_health, fetch_all_prospects, find_duplicate_prospects, find_inactive_prospects, find_missing_critical_fields, find_scoring_inconsistencies, get_filtered_prospects
 from services.engagement_service import get_engagement_programs_analysis, get_engagement_programs_performance
 from services.pdf_service import create_professional_pdf_report, create_form_pdf_report, create_prospect_pdf_report, create_comprehensive_summary_pdf
@@ -184,7 +184,17 @@ def get_form_stats_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        form_stats = get_form_stats(access_token)
+        # Get date filters from query parameters
+        filter_type = request.args.get("filter_type")
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+        
+        # Convert filter type to date range if provided
+        if filter_type and not start_date and not end_date:
+            from services.form_service import get_date_range_from_filter
+            start_date, end_date = get_date_range_from_filter(filter_type)
+        
+        form_stats = get_form_stats(access_token, start_date, end_date)
         # Cache form stats for other form routes
         data_cache['forms'][access_token] = form_stats
         return jsonify(form_stats)
@@ -215,23 +225,45 @@ def get_form_abandonment_analysis_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
+        # Get date filters from query parameters
+        filter_type = request.args.get("filter_type")
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+        
+        # Convert filter type to date range if provided
+        if filter_type and not start_date and not end_date:
+            from services.form_service import get_date_range_from_filter
+            start_date, end_date = get_date_range_from_filter(filter_type)
+        
         # Check cache first
         cached_forms = data_cache['forms'].get(access_token)
-        if cached_forms:
+        if cached_forms and not (start_date or end_date):
             abandonment_data = get_form_abandonment_analysis_from_cache(cached_forms)
         else:
-            abandonment_data = get_form_abandonment_analysis(access_token)
+            abandonment_data = get_form_abandonment_analysis(access_token, start_date, end_date)
         return jsonify(abandonment_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-filtered-form-stats", methods=["GET"])
 def get_filtered_form_stats_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
     try:
+        # Get date filters from query parameters
+        filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        filtered_stats = get_filtered_form_stats(start_date, end_date)
+        # Convert filter type to date range if provided
+        if filter_type and not start_date and not end_date:
+            from services.form_service import get_date_range_from_filter
+            start_date, end_date = get_date_range_from_filter(filter_type)
+        
+        # Fetch fresh data with date filters
+        filtered_stats = get_form_stats(access_token, start_date, end_date)
         return jsonify(filtered_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -244,7 +276,17 @@ def get_landing_page_stats_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        landing_page_stats = get_landing_page_stats(access_token)
+        # Get date filters from query parameters
+        filter_type = request.args.get("filter_type")
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+        
+        # Convert filter type to date range if provided
+        if filter_type and not start_date and not end_date:
+            from services.Landing_page_service import get_date_range_from_filter
+            start_date, end_date = get_date_range_from_filter(filter_type)
+        
+        landing_page_stats = get_landing_page_stats(access_token, start_date, end_date)
         # Cache landing page stats
         data_cache['landing_pages'][access_token] = landing_page_stats
         return jsonify(landing_page_stats)
@@ -253,23 +295,18 @@ def get_landing_page_stats_route():
 
 @app.route("/get-filtered-landing-page-stats", methods=["GET"])
 def get_filtered_landing_page_stats_route():
+    access_token = extract_access_token(request.headers.get("Authorization"))
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
     try:
+        # Get date filters from query parameters
+        filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        filtered_stats = get_filtered_landing_page_stats(start_date, end_date)
+        filtered_stats = get_filtered_landing_page_stats(access_token, filter_type, start_date, end_date)
         return jsonify(filtered_stats)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/get-active-inactive-landing-pages", methods=["GET"])
-def get_active_inactive_landing_pages_route():
-    try:
-        start_date = request.args.get("start_date")
-        end_date = request.args.get("end_date")
-        
-        landing_pages_data = get_active_inactive_landing_pages_from_cache(start_date, end_date)
-        return jsonify(landing_pages_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

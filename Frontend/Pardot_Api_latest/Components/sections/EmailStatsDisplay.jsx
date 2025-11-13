@@ -47,7 +47,7 @@ export default function EmailStatsDisplay({ stats, filterType, startDate, endDat
   const totalHardBounces = stats.reduce((sum, email) => sum + (email.stats?.hardBounces || 0), 0);
   const totalSoftBounces = stats.reduce((sum, email) => sum + (email.stats?.softBounces || 0), 0);
   const totalUnsubscribes = stats.reduce((sum, email) => sum + (email.stats?.unsubscribes || 0), 0);
-  const totalSpamComplaints = stats.reduce((sum, email) => sum + (email.stats?.spamComplaints || 0), 0);
+
 
   const openRate = totalDelivered > 0 ? (totalOpens / totalDelivered * 100) : 0;
   const clickRate = totalDelivered > 0 ? (totalClicks / totalDelivered * 100) : 0;

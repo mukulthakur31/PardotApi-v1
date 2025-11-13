@@ -1,6 +1,5 @@
 import requests
 from datetime import datetime, timezone, timedelta
-from collections import defaultdict
 from utils.auth_utils import get_credentials
 
 def fetch_all_mails(access_token, fields="id,name,subject,createdAt"):
@@ -73,15 +72,11 @@ def fetch_visitor_activities(access_token, filter_start=None, filter_end=None):
             data = response.json()
             page_activities = data.get("result", {}).get("visitor_activity", [])
 
-
             if not page_activities:
                 break
 
             all_activities.extend(page_activities)
-            print(f"Fetched {len(page_activities)} activities, total: {len(all_activities)}")
             offset += limit
-
-           
             
         return all_activities
         
@@ -89,90 +84,93 @@ def fetch_visitor_activities(access_token, filter_start=None, filter_end=None):
         print(f"Error fetching visitor activities: {str(e)}")
         return []
 
-def calculate_stats_from_activities(activities_by_email):
-    """Calculate email stats from visitor activities grouped by email"""
-    email_stats = {}
-    
-    for email_id, activities in activities_by_email.items():
-        stats = {
-            "sent": 0,
-            "delivered": 0,
-            "opened": 0,
-            "clicked": 0,
-            "bounced": 0,
-            "unsubscribed": 0,
-            "optedOut": 0
-        }
-        
-        unique_opens = set()
-        unique_clicks = set()
-        
-        for activity in activities:
-            try:
-                activity_type = int(activity.get("type", 0))
-                visitor_id = activity.get("visitor_id") or activity.get("prospect_id")
+
+def _get_email_stats_internal(access_token, filter_start=None, filter_end=None):
+    try:
+        list_emails = fetch_all_mails(access_token)
+        visitor_activities = fetch_visitor_activities(access_token, filter_start, filter_end)
+
+        # Create email lookup dictionary
+        email_lookup = {email['id']: email for email in list_emails}
+
+        # Count stats for each email
+        email_stats = {}
+        unique_trackers = {}  # Track unique opens/clicks per email
+
+        for activity in visitor_activities:
+            list_email_id = activity.get('list_email_id')
+            activity_type = activity.get('type')
+            visitor_id = activity.get('visitor_id') or activity.get('prospect_id')
+            
+            if list_email_id:
+                if list_email_id not in email_stats:
+                    email_stats[list_email_id] = {
+                        'sent': 0, 'delivered': 0, 'opens': 0, 'clicks': 0,
+                        'uniqueOpens': 0, 'uniqueClicks': 0,
+                        'bounces': 0, 'hardBounces': 0, 'softBounces': 0, 'unsubscribes': 0
+                    }
+                    unique_trackers[list_email_id] = {
+                        'unique_opens': set(),
+                        'unique_clicks': set()
+                    }
                 
-                if activity_type == 6:  # Sent
-                    stats["sent"] += 1
-                elif activity_type == 1:  # Click (Email Tracker)
+                if activity_type == 6:  # Email Send
+                    email_stats[list_email_id]['sent'] += 1
+                elif activity_type == 11:  # Email Open
+                    email_stats[list_email_id]['opens'] += 1
                     if visitor_id:
-                        unique_clicks.add(visitor_id)
-                elif activity_type == 11:  # Open
+                        unique_trackers[list_email_id]['unique_opens'].add(visitor_id)
+                elif activity_type == 1:  # Email Click
+                    email_stats[list_email_id]['clicks'] += 1
                     if visitor_id:
-                        unique_opens.add(visitor_id)
-                elif activity_type in [12, 35]:  # Unsubscribe_Open, Indirect_Unsubscribe_Open
-                    stats["unsubscribed"] += 1
-                elif activity_type in [13, 36]:  # Bounce, Indirect_Bounce
-                    stats["bounced"] += 1
-                elif activity_type == 14:  # Spam_Complaint
-                    stats["bounced"] += 1
-                elif activity_type in [16, 37]:  # Opt_In, Indirect_Opt_In
-                    stats["optedOut"] += 1
-                elif activity_type == 17:  # Third_Party_Click
+                        unique_trackers[list_email_id]['unique_clicks'].add(visitor_id)
+                elif activity_type == 12:  # Email Click (alternative)
+                    email_stats[list_email_id]['clicks'] += 1
                     if visitor_id:
-                        unique_clicks.add(visitor_id)
-            except (ValueError, TypeError):
-                continue
-        
-        stats["opened"] = len(unique_opens)
-        stats["clicked"] = len(unique_clicks)
-        
-        # Calculate delivered as sent minus bounces (Pardot's logic)
-        stats["delivered"] = stats["sent"] - stats["bounced"]
-        
-        # Debug output for first email
-        if len(email_stats) == 0:
-            activity_types = [activity.get('type') for activity in activities]
-            print(f"Email {email_id}: {len(activities)} activities, types: {activity_types}, stats: {stats}")
-        
-        email_stats[email_id] = stats
-    
-    return email_stats
+                        unique_trackers[list_email_id]['unique_clicks'].add(visitor_id)
+                elif activity_type == 13:  # Email Hard Bounce
+                    email_stats[list_email_id]['hardBounces'] += 1
+                    email_stats[list_email_id]['bounces'] += 1
+                elif activity_type == 36:  # Email Soft Bounce
+                    email_stats[list_email_id]['softBounces'] += 1
+                    email_stats[list_email_id]['bounces'] += 1
+                elif activity_type == 13:  # Email Unsubscribe
+                    email_stats[list_email_id]['unsubscribes'] += 1
 
-def fetch_official_email_stats(access_token, email_id):
-    """Fetch official stats from Pardot stats endpoint for comparison"""
-    try:
-        credentials = get_credentials()
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
-        }
+        # Calculate unique counts and delivered
+        for email_id in email_stats:
+            if email_id in unique_trackers:
+                email_stats[email_id]['uniqueOpens'] = len(unique_trackers[email_id]['unique_opens'])
+                email_stats[email_id]['uniqueClicks'] = len(unique_trackers[email_id]['unique_clicks'])
+            
+            # Delivered = Sent - (Hard Bounces + Soft Bounces)
+            email_stats[email_id]['delivered'] = email_stats[email_id]['sent'] - email_stats[email_id]['bounces']
+
+        # Build results - only include emails that exist in list_emails AND have activities
+        results = []
+        for email_id, stats in email_stats.items():
+            email_info = email_lookup.get(email_id)
+            
+            # Only include if email exists in list_emails endpoint
+            if email_info:
+                results.append({
+                    "id": str(email_id),
+                    "name": email_info.get('name', 'Unknown'),
+                    "subject": email_info.get('subject', ''),
+                    "createdat": email_info.get('createdAt', ''),
+                    "stats": stats
+                })
         
-        response = requests.get(f"https://pi.pardot.com/api/v5/objects/list-emails/{email_id}/stats", headers=headers)
+        return results
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return None
     except Exception as e:
-        print(f"Error fetching official stats: {str(e)}")
-        return None
-
+        print(f"Error in get_email_stats: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 def get_email_stats(access_token, filter_type=None, start_date=None, end_date=None):
-    """Main function to get email statistics using visitor activities"""
+    """Main function to get email statistics with date filtering"""
     try:
-        get_credentials()
-        
         # Calculate date range for activity filtering
         now = datetime.now(timezone.utc)
         
@@ -192,106 +190,12 @@ def get_email_stats(access_token, filter_type=None, start_date=None, end_date=No
             filter_start = (now - timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
             filter_end = now.strftime('%Y-%m-%d %H:%M:%S')
         else:
+            # If no filter specified, get all activities (no date filter)
             filter_start = None
             filter_end = None
         
-        # Fetch all emails
-        emails = fetch_all_mails(access_token)
-        print(f"Found {len(emails)} emails")
-        
-        # Fetch visitor activities with date filter
-        activities = fetch_visitor_activities(access_token, filter_start, filter_end)
-        print(f"Found {len(activities)} activities")
-        
-        # Group activities by email ID
-        activities_by_email = defaultdict(list)
-        for activity in activities:
-            email_id = activity.get("list_email_id")
-            if email_id:
-                activities_by_email[str(email_id)].append(activity)
-        
-        print(f"Activities grouped by {len(activities_by_email)} emails")
-        
-        # Debug: Print activity type distribution
-        if activities:
-            type_counts = {}
-            for activity in activities[:100]:  # Check first 100 activities
-                activity_type = activity.get('type')
-                type_counts[activity_type] = type_counts.get(activity_type, 0) + 1
-            print(f"Activity type distribution (first 100): {type_counts}")
-            
-            sample_activity = activities[0]
-            print(f"Sample activity: type={sample_activity.get('type')}, type_name={sample_activity.get('type_name')}, list_email_id={sample_activity.get('list_email_id')}")
-        
-        # Calculate stats for each email
-        email_stats = calculate_stats_from_activities(activities_by_email)
-        
-        # Debug: Compare with official stats for first few emails
-        comparison_count = 0
-        for email in emails[:5]:  # Compare first 5 emails
-            email_id = str(email.get('id'))
-            if email_id in email_stats:
-                official_stats = fetch_official_email_stats(access_token, email_id)
-                calculated_stats = email_stats[email_id]
-                
-                if official_stats:
-                    print(f"\nEmail {email_id} comparison:")
-                    
-                    # Detailed field-by-field comparison
-                    print(f"Sent: Official={official_stats.get('sent', 0)} vs Calculated={calculated_stats['sent']}")
-                    print(f"Delivered: Official={official_stats.get('delivered', 0)} vs Calculated={calculated_stats['delivered']}")
-                    print(f"Opens: Official={official_stats.get('uniqueOpens', 0)} vs Calculated={calculated_stats['opened']}")
-                    print(f"Clicks: Official={official_stats.get('uniqueClicks', 0)} vs Calculated={calculated_stats['clicked']}")
-                    print(f"Bounced: Official={official_stats.get('hardBounced', 0) + official_stats.get('softBounced', 0)} vs Calculated={calculated_stats['bounced']}")
-                    print(f"OptOuts: Official={official_stats.get('optOuts', 0)} vs Calculated={calculated_stats['optedOut']}")
-                    
-                    # Check for mismatches
-                    mismatches = []
-                    if official_stats.get('sent', 0) != calculated_stats['sent']:
-                        mismatches.append('sent')
-                    if official_stats.get('delivered', 0) != calculated_stats['delivered']:
-                        mismatches.append('delivered')
-                    if official_stats.get('uniqueOpens', 0) != calculated_stats['opened']:
-                        mismatches.append('opens')
-                    if official_stats.get('uniqueClicks', 0) != calculated_stats['clicked']:
-                        mismatches.append('clicks')
-                    if (official_stats.get('hardBounced', 0) + official_stats.get('softBounced', 0)) != calculated_stats['bounced']:
-                        mismatches.append('bounced')
-                    if official_stats.get('optOuts', 0) != calculated_stats['optedOut']:
-                        mismatches.append('optOuts')
-                    
-                    if mismatches:
-                        print(f"❌ MISMATCHES: {mismatches}")
-                    else:
-                        print("✅ ALL MATCH")
-                    
-                    comparison_count += 1
-                    
-                if comparison_count >= 5:  # Limit comparisons
-                    break
-        
-        # Combine email info with stats
-        results = []
-        for email in emails:
-            email_id = str(email.get('id'))
-            stats = email_stats.get(email_id, {
-                "sent": 0, "delivered": 0, "opened": 0, "clicked": 0,
-                "bounced": 0, "unsubscribed": 0, "optedOut": 0
-            })
-            
-            results.append({
-                "id": email_id,
-                "name": email.get("name", "Unknown"),
-                "subject": email.get("subject", ""),
-                "createdat": email.get("createdAt", ""),
-                "stats": stats
-            })
-        
-        print(f"Processed stats for {len(results)} emails using visitor activities")
-        return results
+        return _get_email_stats_internal(access_token, filter_start, filter_end)
         
     except Exception as e:
         print(f"Error in get_email_stats: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise e
+        return []

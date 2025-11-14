@@ -95,7 +95,7 @@ def _get_email_stats_internal(access_token, filter_start=None, filter_end=None):
 
         # Count stats for each email
         email_stats = {}
-        unique_trackers = {}  # Track unique opens/clicks per email
+        unique_trackers = {}  
 
         for activity in visitor_activities:
             list_email_id = activity.get('list_email_id')
@@ -134,24 +134,23 @@ def _get_email_stats_internal(access_token, filter_start=None, filter_end=None):
                 elif activity_type == 36:  # Email Soft Bounce
                     email_stats[list_email_id]['softBounces'] += 1
                     email_stats[list_email_id]['bounces'] += 1
-                elif activity_type == 13:  # Email Unsubscribe
+                elif activity_type == 13:  
                     email_stats[list_email_id]['unsubscribes'] += 1
 
-        # Calculate unique counts and delivered
+ 
         for email_id in email_stats:
             if email_id in unique_trackers:
                 email_stats[email_id]['uniqueOpens'] = len(unique_trackers[email_id]['unique_opens'])
                 email_stats[email_id]['uniqueClicks'] = len(unique_trackers[email_id]['unique_clicks'])
-            
-            # Delivered = Sent - (Hard Bounces + Soft Bounces)
+          
             email_stats[email_id]['delivered'] = email_stats[email_id]['sent'] - email_stats[email_id]['bounces']
 
-        # Build results - only include emails that exist in list_emails AND have activities
+       
         results = []
         for email_id, stats in email_stats.items():
             email_info = email_lookup.get(email_id)
             
-            # Only include if email exists in list_emails endpoint
+            
             if email_info:
                 results.append({
                     "id": str(email_id),
@@ -171,7 +170,7 @@ def _get_email_stats_internal(access_token, filter_start=None, filter_end=None):
 def get_email_stats(access_token, filter_type=None, start_date=None, end_date=None):
     """Main function to get email statistics with date filtering"""
     try:
-        # Calculate date range for activity filtering
+        
         now = datetime.now(timezone.utc)
         
         if filter_type == "custom" and start_date and end_date:
@@ -190,7 +189,7 @@ def get_email_stats(access_token, filter_type=None, start_date=None, end_date=No
             filter_start = (now - timedelta(days=180)).strftime('%Y-%m-%d %H:%M:%S')
             filter_end = now.strftime('%Y-%m-%d %H:%M:%S')
         else:
-            # If no filter specified, get all activities (no date filter)
+           
             filter_start = None
             filter_end = None
         

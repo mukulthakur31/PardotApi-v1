@@ -257,18 +257,18 @@ def get_filtered_form_stats_route():
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        # Convert filter type to date range if provided
+        
         if filter_type and not start_date and not end_date:
             from services.form_service import get_date_range_from_filter
             start_date, end_date = get_date_range_from_filter(filter_type)
         
-        # Fetch fresh data with date filters
+       
         filtered_stats = get_form_stats(access_token, start_date, end_date)
         return jsonify(filtered_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ===== Landing Page Routes =====
+
 @app.route("/get-landing-page-stats", methods=["GET"])
 def get_landing_page_stats_route():
     access_token = extract_access_token(request.headers.get("Authorization"))
@@ -276,18 +276,18 @@ def get_landing_page_stats_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        # Get date filters from query parameters
+       
         filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")
         
-        # Convert filter type to date range if provided
+     
         if filter_type and not start_date and not end_date:
             from services.Landing_page_service import get_date_range_from_filter
             start_date, end_date = get_date_range_from_filter(filter_type)
         
         landing_page_stats = get_landing_page_stats(access_token, start_date, end_date)
-        # Cache landing page stats
+       
         data_cache['landing_pages'][access_token] = landing_page_stats
         return jsonify(landing_page_stats)
     except Exception as e:
@@ -300,7 +300,7 @@ def get_filtered_landing_page_stats_route():
         return jsonify({"error": "Access token is required"}), 401
     
     try:
-        # Get date filters from query parameters
+        
         filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
         end_date = request.args.get("end_date")

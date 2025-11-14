@@ -9,3 +9,5 @@ REDIRECT_URI = "http://localhost:4001/callback"
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
+CLIENT_SECRET=os.getenv("CLIENT_SECRET")
+CLIENT_ID=os.getenv("CLIENT_ID")

@@ -1,9 +1,12 @@
 from flask import Flask, redirect, request, jsonify, send_file, session
 import requests
 from flask_cors import CORS
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
 # Import configuration
-from config.settings import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SECRET_KEY
+from config.settings import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SECRET_KEY,CLIENT_ID,CLIENT_SECRET
 
 # Import utilities
 from utils.auth_utils import get_credentials, extract_access_token
@@ -25,7 +28,6 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
 # Security: Configure CORS properly for production
-
 CORS(app, 
      origins=["http://localhost:5173"], 
      supports_credentials=True,
@@ -36,49 +38,12 @@ CORS(app,
 # Google Integration
 google_integration = GoogleIntegration(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
-# In-memory cache for all data types
-data_cache = {
-    'prospects': {},
-    'forms': {},
-    'landing_pages': {},
-    'engagement': {},
-    'emails': {}
-}
-
-# In-memory cache for prospect data (expires after 30 minutes)
-prospect_cache = {}
-CACHE_EXPIRY = 1800  # 30 minutes in seconds
-
-# ===== Authentication Routes =====
-@app.route("/setup", methods=["POST", "OPTIONS"])
-def setup():
-    if request.method == "OPTIONS":
-        return "", 200
-    
-    data = request.json
-    required_fields = ['client_id', 'client_secret', 'business_unit_id']
-    
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({"error": f"{field} is required"}), 400
-    
-    # Store only necessary credentials, use client_secret immediately
-    session['pardot_credentials'] = {
-        'client_id': data['client_id'],
-        'business_unit_id': data['business_unit_id']
-    }
-    # Store client_secret temporarily for OAuth flow only
-    session['temp_client_secret'] = data['client_secret']
-    
-    return jsonify({"message": "Credentials stored successfully"})
-
 @app.route("/login")
 def login():
     try:
-        credentials = get_credentials()
         auth_url = (
             "https://login.salesforce.com/services/oauth2/authorize"
-            f"?response_type=code&client_id={credentials['client_id']}&redirect_uri={REDIRECT_URI}"
+            f"?response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}"
             "&scope=api%20pardot_api%20full%20refresh_token"
         )
         return redirect(auth_url)
@@ -92,21 +57,19 @@ def callback():
         return jsonify({"error": "No code received"}), 400
 
     try:
-        credentials = get_credentials()
-        client_secret = session.get('temp_client_secret')
+     
+        client_secret = CLIENT_SECRET
         if not client_secret:
             return jsonify({"error": "OAuth session expired"}), 400
             
         token_response = requests.post("https://login.salesforce.com/services/oauth2/token", data={
             "grant_type": "authorization_code",
             "code": auth_code,
-            "client_id": credentials['client_id'],
+            "client_id": CLIENT_ID,
             "client_secret": client_secret,
             "redirect_uri": REDIRECT_URI
         })
         
-        # Clear temporary client_secret after use
-        session.pop('temp_client_secret', None)
 
         if token_response.status_code != 200:
             return jsonify({"error": token_response.text}), 500

@@ -1,14 +1,12 @@
 import requests
-
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
 
 def get_engagement_programs_analysis(access_token):
     """Analyze engagement programs for completion rates and entries"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         # Fetch engagement programs
@@ -56,10 +54,9 @@ def get_engagement_programs_analysis(access_token):
 def get_engagement_programs_performance(access_token):
     """Get detailed performance metrics for engagement programs"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         # Fetch engagement program statistics

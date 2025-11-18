@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime, timedelta
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
 from .prospect_filter_service import filter_prospects
 
 def fetch_all_prospects(headers):
@@ -227,10 +227,9 @@ def analyze_prospect_health(prospects, headers):
 def get_prospect_health(access_token):
     """Main function to get prospect health analysis"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         prospects = fetch_all_prospects(headers)
@@ -244,10 +243,9 @@ def get_prospect_health(access_token):
 def get_filtered_prospects(access_token, filters):
     """Get filtered prospects based on provided filters"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         # Get all prospects (this could be cached for better performance)

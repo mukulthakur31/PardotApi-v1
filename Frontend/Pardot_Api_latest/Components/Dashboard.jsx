@@ -163,9 +163,7 @@ export default function Dashboard() {
 
   const validateToken = async () => {
     try {
-      const response = await axios.get("http://localhost:4001/validate-token", {
-        headers: { Authorization: token }
-      });
+      const response = await axios.get("http://localhost:4001/validate-token");
 
       if (response.data.valid) {
         setPardotConnected(true);
@@ -224,7 +222,6 @@ export default function Dashboard() {
     setLoading(true);
     axios
       .get("http://localhost:4001/get-email-stats", {
-        headers: { Authorization: token },
         params,
       })
       .then((res) => {
@@ -239,9 +236,7 @@ export default function Dashboard() {
   const getFormStats = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-form-stats", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-form-stats")
       .then((res) => {
         setFormStats(res.data);
       })
@@ -252,9 +247,7 @@ export default function Dashboard() {
   const getProspectHealth = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-prospect-health", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-prospect-health")
       .then((res) => {
         setProspectHealth(res.data);
       })
@@ -265,9 +258,7 @@ export default function Dashboard() {
   const getInactiveProspects = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-inactive-prospects", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-inactive-prospects")
       .then((res) => {
         setInactiveProspects(res.data);
         setActiveProspectView('inactive');
@@ -279,9 +270,7 @@ export default function Dashboard() {
   const getDuplicateProspects = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-duplicate-prospects", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-duplicate-prospects")
       .then((res) => {
         setDuplicateProspects(res.data);
         setActiveProspectView('duplicates');
@@ -293,9 +282,7 @@ export default function Dashboard() {
   const getMissingFieldsProspects = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-missing-fields-prospects", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-missing-fields-prospects")
       .then((res) => {
         setMissingFieldsProspects(res.data);
         setActiveProspectView('missing-fields');
@@ -309,9 +296,7 @@ export default function Dashboard() {
   const getActiveInactiveForms = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-active-inactive-forms", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-active-inactive-forms")
       .then((res) => {
         setActiveInactiveForms(res.data);
         setActiveFormView('active-inactive');
@@ -323,9 +308,7 @@ export default function Dashboard() {
   const getFormAbandonmentAnalysis = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-form-abandonment-analysis", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-form-abandonment-analysis")
       .then((res) => {
         setFormAbandonmentData(res.data);
         setActiveFormView('abandonment');
@@ -337,9 +320,7 @@ export default function Dashboard() {
   const getLandingPageStats = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-landing-page-stats", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-landing-page-stats")
       .then((res) => {
         setLandingPageStats(res.data);
         setActiveLandingPageView('overview');
@@ -352,9 +333,7 @@ export default function Dashboard() {
   const getEngagementAnalysis = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-engagement-programs-analysis", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-engagement-programs-analysis")
       .then((res) => {
         setEngagementAnalysis(res.data);
       })
@@ -365,9 +344,7 @@ export default function Dashboard() {
   const getUTMAnalysis = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-utm-analysis", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-utm-analysis")
       .then((res) => {
         setUtmAnalysis(res.data);
       })
@@ -378,9 +355,7 @@ export default function Dashboard() {
   const getCampaignEngagementAnalysis = () => {
     setLoading(true);
     axios
-      .get("http://localhost:4001/get-campaign-engagement-analysis", {
-        headers: { Authorization: token }
-      })
+      .get("http://localhost:4001/get-campaign-engagement-analysis")
       .then((res) => {
         setCampaignEngagement(res.data);
       })
@@ -419,7 +394,6 @@ export default function Dashboard() {
     
     axios
       .post("http://localhost:4001/download-pdf", requestData, {
-        headers: { Authorization: token },
         responseType: "blob",
       })
       .then((res) => {
@@ -437,7 +411,6 @@ export default function Dashboard() {
     setPdfLoading(true);
     axios
       .post("http://localhost:4001/download-summary-pdf", {}, {
-        headers: { Authorization: token },
         responseType: "blob",
       })
       .then((res) => {
@@ -457,9 +430,7 @@ export default function Dashboard() {
 
   const authenticateGoogle = async () => {
     try {
-      const response = await axios.get("http://localhost:4001/google-auth", {
-        headers: { Authorization: token }
-      });
+      const response = await axios.get("http://localhost:4001/google-auth");
       window.location.href = response.data.auth_url;
     } catch (err) {
       console.error("Error initiating Google auth:", err);
@@ -565,10 +536,7 @@ export default function Dashboard() {
       
       const response = await axios.post(
         "http://localhost:4001/export-to-sheets",
-        exportData,
-        {
-          headers: { Authorization: token }
-        }
+        exportData
       );
 
       setSpreadsheetId(response.data.spreadsheet_id);

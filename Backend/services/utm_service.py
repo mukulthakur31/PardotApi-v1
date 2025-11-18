@@ -1,7 +1,7 @@
 import requests
 import datetime
 from dateutil import parser
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
 
 def get_prospects_with_utm(headers):
     """Get prospects with UTM fields using nextPageUrl pagination"""
@@ -95,10 +95,9 @@ def get_utm_analysis(access_token):
         if not access_token or len(access_token.strip()) == 0:
             raise ValueError("Invalid access token")
             
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id'],
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID,
             "Content-Type": "application/json"
         }
         
@@ -212,7 +211,6 @@ def get_campaign_engagement_analysis(months_back="6"):
         except (ValueError, TypeError):
             months_back = "6"
             
-        credentials = get_credentials()
         from flask import session
         access_token = session.get('access_token')
         if not access_token:
@@ -220,7 +218,7 @@ def get_campaign_engagement_analysis(months_back="6"):
         
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id'],
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID,
             "Content-Type": "application/json"
         }
         

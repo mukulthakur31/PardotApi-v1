@@ -2,7 +2,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import datetime, timedelta
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
 import json
 import os
 
@@ -99,10 +99,9 @@ def calculate_form_stats(form, activities_by_form):
 def get_form_stats(access_token, created_after=None, created_before=None):
     """Main function to get form statistics with optional date filtering"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         print(f"Fetching forms and activities with headers: {headers}")

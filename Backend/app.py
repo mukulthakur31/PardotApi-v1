@@ -6,10 +6,7 @@ import os
 load_dotenv()
 
 # Import configuration
-from config.settings import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SECRET_KEY,CLIENT_ID,CLIENT_SECRET
-
-# Import utilities
-from utils.auth_utils import get_credentials, extract_access_token
+from config.settings import REDIRECT_URI, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SECRET_KEY,CLIENT_ID,CLIENT_SECRET,BUSINESS_UNIT_ID
 
 # Import services
 from services.email_service import get_email_stats
@@ -23,6 +20,9 @@ from services.utm_service import get_utm_analysis, get_campaign_engagement_analy
 
 # Import Google integration
 from google_integration import GoogleIntegration
+
+# Initialize data cache
+data_cache = {'forms': {}, 'landing_pages': {}, 'prospects': {}, 'engagement': {}}
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -94,15 +94,14 @@ def get_token():
 @app.route("/validate-token", methods=["GET"])
 def validate_token():
     """Validate if current token is still valid"""
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"valid": False, "error": "No token provided"}), 401
     
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         # Test token with a simple API call
@@ -125,7 +124,7 @@ def validate_token():
 # ===== Email Routes =====
 @app.route("/get-email-stats", methods=["GET"])
 def get_email_stats_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
 
@@ -142,7 +141,7 @@ def get_email_stats_route():
 # ===== Form Routes =====
 @app.route("/get-form-stats", methods=["GET"])
 def get_form_stats_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -166,7 +165,7 @@ def get_form_stats_route():
 
 @app.route("/get-active-inactive-forms", methods=["GET"])
 def get_active_inactive_forms_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -183,7 +182,7 @@ def get_active_inactive_forms_route():
 
 @app.route("/get-form-abandonment-analysis", methods=["GET"])
 def get_form_abandonment_analysis_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -210,7 +209,7 @@ def get_form_abandonment_analysis_route():
 
 @app.route("/get-filtered-form-stats", methods=["GET"])
 def get_filtered_form_stats_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -234,7 +233,7 @@ def get_filtered_form_stats_route():
 
 @app.route("/get-landing-page-stats", methods=["GET"])
 def get_landing_page_stats_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -258,7 +257,7 @@ def get_landing_page_stats_route():
 
 @app.route("/get-filtered-landing-page-stats", methods=["GET"])
 def get_filtered_landing_page_stats_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -275,7 +274,7 @@ def get_filtered_landing_page_stats_route():
 
 @app.route("/get-landing-page-field-issues", methods=["GET"])
 def get_landing_page_field_issues():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -317,7 +316,7 @@ def get_landing_page_field_issues():
 # ===== Prospect Routes =====
 @app.route("/get-prospect-health", methods=["GET"])
 def get_prospect_health_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token required"}), 401
     
@@ -331,7 +330,7 @@ def get_prospect_health_route():
 
 @app.route("/get-inactive-prospects", methods=["GET"])
 def get_inactive_prospects():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     try:
         # Use cached data from memory if available
         cached_health = data_cache['prospects'].get(access_token)
@@ -350,7 +349,7 @@ def get_inactive_prospects():
 
 @app.route("/get-duplicate-prospects", methods=["GET"])
 def get_duplicate_prospects():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     try:
         # Use cached data from memory if available
         cached_health = data_cache['prospects'].get(access_token)
@@ -369,7 +368,7 @@ def get_duplicate_prospects():
 
 @app.route("/get-missing-fields-prospects", methods=["GET"])
 def get_missing_fields_prospects():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     try:
         # Use cached data from memory if available
         cached_health = data_cache['prospects'].get(access_token)
@@ -547,7 +546,7 @@ def apply_simple_filters(prospects, filters):
 # ===== Engagement Programs Routes =====
 @app.route("/get-engagement-programs-analysis", methods=["GET"])
 def get_engagement_programs_analysis_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token required"}), 401
     
@@ -561,7 +560,7 @@ def get_engagement_programs_analysis_route():
 
 @app.route("/get-engagement-programs-performance", methods=["GET"])
 def get_engagement_programs_performance_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token required"}), 401
     
@@ -610,7 +609,7 @@ def download_pdf():
 @app.route("/download-summary-pdf", methods=["POST"])
 def download_summary_pdf():
     """Generate comprehensive summary PDF with all data sections"""
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token is required"}), 401
     
@@ -718,7 +717,7 @@ def google_auth_status():
 # ===== Campaign and UTM Analysis Routes =====
 @app.route("/get-utm-analysis", methods=["GET"])
 def get_utm_analysis_route():
-    access_token = extract_access_token(request.headers.get("Authorization"))
+    access_token = session.get('access_token')
     if not access_token:
         return jsonify({"error": "Access token required"}), 401
     

@@ -1,14 +1,15 @@
 import requests
 from datetime import datetime, timezone, timedelta
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
+
 
 def fetch_all_mails(access_token, fields="id,name,subject,createdAt"):
     """Fetch all emails without date filtering"""
     try:
-        credentials = get_credentials()
+        
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         all_mails = []
@@ -36,10 +37,9 @@ def fetch_all_mails(access_token, fields="id,name,subject,createdAt"):
 def fetch_visitor_activities(access_token, filter_start=None, filter_end=None):
     """Fetch email visitor activities using v4 API with email_only parameter"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         all_activities = []

@@ -2,7 +2,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from datetime import datetime, timedelta
-from utils.auth_utils import get_credentials
+from config.settings import BUSINESS_UNIT_ID
 import json
 import os
 
@@ -82,10 +82,9 @@ def calculate_landing_page_stats(page, activities_by_page):
 def get_landing_page_stats(access_token, created_after=None, created_before=None):
     """Get landing page statistics with optional date filtering"""
     try:
-        credentials = get_credentials()
         headers = {
             "Authorization": f"Bearer {access_token}",
-            "Pardot-Business-Unit-Id": credentials['business_unit_id']
+            "Pardot-Business-Unit-Id": BUSINESS_UNIT_ID
         }
         
         print("Fetching landing pages and activities...")

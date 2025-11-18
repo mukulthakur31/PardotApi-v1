@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import EmailStatsDisplay from "./sections/EmailStatsDisplay";
 import FormsSection from "./sections/FormsSection";
@@ -6,7 +6,6 @@ import LandingPagesSection from "./sections/LandingPagesSection";
 import ProspectsSection from "./sections/ProspectsSection";
 import EngagementSection from "./sections/EngagementSection";
 import UTMSection from "./sections/UTMSection";
-import StatusCards from "./sections/StatusCards";
 import CustomDateFilter from "./sections/CustomDateFilter";
 import ActionTiles from "./sections/ActionTiles";
 

@@ -1,0 +1,80 @@
+from flask import Blueprint, request, jsonify, send_file, session
+from services.pdf_service import (
+    create_professional_pdf_report, create_form_pdf_report, 
+    create_prospect_pdf_report, create_comprehensive_summary_pdf
+)
+from services.email_service import get_email_stats
+from services.form_service import get_form_stats
+from services.prospect_service import get_prospect_health
+from services.Landing_page_service import get_landing_page_stats
+from services.engagement_service import get_engagement_programs_analysis
+from services.utm_service import get_utm_analysis
+
+pdf_bp = Blueprint('pdf', __name__)
+
+@pdf_bp.route("/download-pdf", methods=["POST"])
+def download_pdf():
+    try:
+        data_type = request.json.get("data_type", "emails")
+        data = request.json.get("data")
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        if data_type == "emails":
+            filters = request.json.get("filters", {})
+            day = filters.get("day")
+            month = filters.get("month")
+            year = filters.get("year")
+            buffer = create_professional_pdf_report(data, day, month, year)
+            filename = "email_campaign_report.pdf"
+        elif data_type == "forms":
+            buffer = create_form_pdf_report(data)
+            filename = "form_stats_report.pdf"
+        elif data_type == "prospects":
+            buffer = create_prospect_pdf_report(data)
+            filename = "prospect_health_report.pdf"
+        else:
+            return jsonify({"error": "Invalid data type"}), 400
+        
+        return send_file(buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@pdf_bp.route("/download-summary-pdf", methods=["POST"])
+def download_summary_pdf():
+    access_token = session.get('access_token')
+    if not access_token:
+        return jsonify({"error": "Access token is required"}), 401
+    
+    try:
+        email_stats = get_email_stats(access_token)
+        form_stats = get_form_stats(access_token)
+        prospect_health = get_prospect_health(access_token)
+        landing_page_stats = get_landing_page_stats(access_token)
+        
+        engagement_programs = None
+        utm_analysis = None
+        
+        try:
+            engagement_programs = get_engagement_programs_analysis(access_token)
+        except Exception as e:
+            print(f"Error fetching engagement programs: {str(e)}")
+        
+        try:
+            utm_analysis = get_utm_analysis(access_token)
+        except Exception as e:
+            print(f"Error fetching Campaign and UTM analysis: {str(e)}")
+        
+        buffer = create_comprehensive_summary_pdf(
+            email_stats, 
+            form_stats, 
+            prospect_health, 
+            landing_page_stats,
+            engagement_programs,
+            utm_analysis
+        )
+        
+        return send_file(buffer, as_attachment=True, download_name="pardot_comprehensive_report.pdf", mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

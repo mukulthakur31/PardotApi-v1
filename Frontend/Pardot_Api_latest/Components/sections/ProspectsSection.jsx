@@ -20,47 +20,26 @@ export default function ProspectsSection({
   // Initialize with all prospects when component mounts
   useEffect(() => {
     if (prospectHealth?.all_prospects) {
-      console.log('Setting initial prospects:', prospectHealth.all_prospects.length);
       setFilteredProspects(prospectHealth.all_prospects);
     }
   }, [prospectHealth]);
 
-  // Prevent scroll jumping during updates
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.body.style.overflow = 'hidden';
-      const timer = setTimeout(() => {
-        document.body.style.overflow = 'auto';
-      }, 100);
-      return () => {
-        clearTimeout(timer);
-        document.body.style.overflow = 'auto';
-      };
-    }
-  }, [prospectHealth, filteredProspects]);
-
   const handleFiltersChange = async (filters) => {
     setIsFilterLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      console.log('Sending filters:', filters);
-      
-      const response = await fetch('http://127.0.0.1:4001/filter-prospects', {
+      const response = await fetch('http://localhost:4001/filter-prospects', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(filters)
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Filter response:', data);
         setFilteredProspects(data.prospects || []);
       } else {
-        const errorText = await response.text();
-        console.error('Filter failed:', response.status, errorText);
         setFilteredProspects([]);
       }
     } catch (error) {

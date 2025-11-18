@@ -3,12 +3,21 @@ import time
 from config.settings import CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, SF_LOGIN_URL
 
 class SalesforceAuthService:
+    _instance = None
+    _token_data = {
+        "access_token": None,
+        "refresh_token": None,
+        "expires_at": None
+    }
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SalesforceAuthService, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
-        self.token_data = {
-            "access_token": None,
-            "refresh_token": None,
-            "expires_at": None
-        }
+        # Use class-level token_data to share across instances
+        self.token_data = SalesforceAuthService._token_data
 
     def save_tokens(self, data):
         """Save access/refresh token with expiry timestamp."""

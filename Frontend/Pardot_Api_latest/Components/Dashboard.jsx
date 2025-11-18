@@ -92,7 +92,7 @@ export default function Dashboard() {
   const [landingPageStats, setLandingPageStats] = useState(null);
 
 
-  const [token, setToken] = useState("");
+  // const [token, setToken] = useState("");
   const [pardotConnected, setPardotConnected] = useState(false);
   const [googleAuth, setGoogleAuth] = useState(false);
   const [spreadsheetId, setSpreadsheetId] = useState("");
@@ -160,32 +160,32 @@ export default function Dashboard() {
     };
   }, [token]);
 
-  const validateToken = async () => {
-    try {
-      const response = await axios.get("http://localhost:4001/validate-token");
+  // const validateToken = async () => {
+  //   try {
+  //     const response = await axios.get("http://localhost:4001/validate-token");
 
-      if (response.data.valid) {
-        setPardotConnected(true);
-      } else {
-        setPardotConnected(false);
-        setToken("");
-        window.location.href = "/";
-      }
-    } catch (error) {
-      setPardotConnected(false);
-      setToken("");
-      if (error.response?.status === 401) {
-        window.location.href = "/";
-      }
-    }
-  };
+  //     if (response.data.valid) {
+  //       setPardotConnected(true);
+  //     } else {
+  //       setPardotConnected(false);
+  //       setToken("");
+  //       window.location.href = "/";
+  //     }
+  //   } catch (error) {
+  //     setPardotConnected(false);
+  //     setToken("");
+  //     if (error.response?.status === 401) {
+  //       window.location.href = "/";
+  //     }
+  //   }
+  // };
 
   // Validate token when it changes
-  useEffect(() => {
-    if (token) {
-      validateToken();
-    }
-  }, [token]);
+  // useEffect(() => {
+  //   if (token) {
+  //     validateToken();
+  //   }
+  // }, [token]);
 
 
 

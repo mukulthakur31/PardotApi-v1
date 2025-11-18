@@ -10,23 +10,24 @@ prospect_bp = Blueprint('prospect', __name__)
 # Import shared data_cache
 from shared import data_cache
 
+from middleware.auth_middleware import require_auth
+from flask import g
+
 @prospect_bp.route("/get-prospect-health", methods=["GET"])
+@require_auth
 def get_prospect_health_route():
-    access_token = session.get('access_token')
-    if not access_token:
-        return jsonify({"error": "Access token required"}), 401
-    
     try:
-        health_data = get_prospect_health(access_token)
-        data_cache['prospects'][access_token] = health_data
+        health_data = get_prospect_health(g.access_token)
+        data_cache['prospects'][g.access_token] = health_data
         return jsonify(health_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @prospect_bp.route("/get-inactive-prospects", methods=["GET"])
+@require_auth
 def get_inactive_prospects():
-    access_token = session.get('access_token')
     try:
+        access_token = g.access_token
         cached_health = data_cache['prospects'].get(access_token)
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
@@ -42,9 +43,10 @@ def get_inactive_prospects():
         return jsonify({"error": str(e)}), 500
 
 @prospect_bp.route("/get-duplicate-prospects", methods=["GET"])
+@require_auth
 def get_duplicate_prospects():
-    access_token = session.get('access_token')
     try:
+        access_token = g.access_token
         cached_health = data_cache['prospects'].get(access_token)
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
@@ -60,9 +62,10 @@ def get_duplicate_prospects():
         return jsonify({"error": str(e)}), 500
 
 @prospect_bp.route("/get-missing-fields-prospects", methods=["GET"])
+@require_auth
 def get_missing_fields_prospects():
-    access_token = session.get('access_token')
     try:
+        access_token = g.access_token
         cached_health = data_cache['prospects'].get(access_token)
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
@@ -78,6 +81,7 @@ def get_missing_fields_prospects():
         return jsonify({"error": str(e)}), 500
 
 @prospect_bp.route("/filter-prospects", methods=["POST"])
+@require_auth
 def filter_prospects_route():
     try:
         filters = request.json or {}

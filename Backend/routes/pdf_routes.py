@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file, session
+from flask import Blueprint, request, jsonify, send_file, g
 from services.pdf_service import (
     create_professional_pdf_report, create_form_pdf_report, 
     create_prospect_pdf_report, create_comprehensive_summary_pdf
@@ -9,6 +9,7 @@ from services.prospect_service import get_prospect_health
 from services.Landing_page_service import get_landing_page_stats
 from services.engagement_service import get_engagement_programs_analysis
 from services.utm_service import get_utm_analysis
+from middleware.auth_middleware import require_auth
 
 pdf_bp = Blueprint('pdf', __name__)
 
@@ -42,27 +43,25 @@ def download_pdf():
         return jsonify({"error": str(e)}), 500
 
 @pdf_bp.route("/download-summary-pdf", methods=["POST"])
+@require_auth
 def download_summary_pdf():
-    access_token = session.get('access_token')
-    if not access_token:
-        return jsonify({"error": "Access token is required"}), 401
     
     try:
-        email_stats = get_email_stats(access_token)
-        form_stats = get_form_stats(access_token)
-        prospect_health = get_prospect_health(access_token)
-        landing_page_stats = get_landing_page_stats(access_token)
+        email_stats = get_email_stats(g.access_token)
+        form_stats = get_form_stats(g.access_token)
+        prospect_health = get_prospect_health(g.access_token)
+        landing_page_stats = get_landing_page_stats(g.access_token)
         
         engagement_programs = None
         utm_analysis = None
         
         try:
-            engagement_programs = get_engagement_programs_analysis(access_token)
+            engagement_programs = get_engagement_programs_analysis(g.access_token)
         except Exception as e:
             print(f"Error fetching engagement programs: {str(e)}")
         
         try:
-            utm_analysis = get_utm_analysis(access_token)
+            utm_analysis = get_utm_analysis(g.access_token)
         except Exception as e:
             print(f"Error fetching Campaign and UTM analysis: {str(e)}")
         

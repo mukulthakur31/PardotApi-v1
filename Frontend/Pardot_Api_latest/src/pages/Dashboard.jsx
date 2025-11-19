@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, createContext, useContext } from 'react'
 import { useNavigate, Outlet, useLocation } from 'react-router-dom'
+
+// Create Google Auth Context
+const GoogleAuthContext = createContext()
+
+export const useGoogleAuth = () => {
+  const context = useContext(GoogleAuthContext)
+  if (!context) {
+    throw new Error('useGoogleAuth must be used within Dashboard')
+  }
+  return context
+}
 
 const Dashboard = () => {
   const [pardotConnected, setPardotConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
+  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -11,7 +23,6 @@ const Dashboard = () => {
   const activeModule = location.pathname.split('/')[2] || 'emails'
 
   useEffect(() => {
-    // Check authentication on load
     checkAuth()
     checkGoogleAuthStatus()
     
@@ -19,7 +30,6 @@ const Dashboard = () => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('google_auth') === 'success') {
       setGoogleConnected(true)
-      // Remove the parameter from URL
       window.history.replaceState({}, document.title, window.location.pathname)
     }
   }, [])
@@ -53,40 +63,64 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error checking Google auth:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleGoogleConnect = async () => {
-    if (googleConnected) {
-      // Disconnect Google
-      try {
-        const response = await fetch('http://localhost:4001/google-disconnect', {
-          method: 'POST',
-          credentials: 'include'
-        })
-        
-        if (response.ok) {
-          setGoogleConnected(false)
-        }
-      } catch (error) {
-        console.error('Error disconnecting Google:', error)
+  const handleGoogleAuth = async () => {
+    try {
+      const response = await fetch('http://localhost:4001/google-auth', {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        window.location.href = data.auth_url
       }
-    } else {
-      // Connect to Google
-      try {
-        const response = await fetch('http://localhost:4001/google-auth', {
-          credentials: 'include'
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          // Redirect to Google auth URL in same tab
-          window.location.href = data.auth_url
-        }
-      } catch (error) {
-        console.error('Error connecting to Google:', error)
-      }
+    } catch (error) {
+      console.error('Error connecting to Google:', error)
+      throw error
     }
+  }
+
+  const disconnectGoogle = async () => {
+    try {
+      const response = await fetch('http://localhost:4001/google-disconnect', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        setGoogleConnected(false)
+      }
+    } catch (error) {
+      console.error('Error disconnecting Google:', error)
+      throw error
+    }
+  }
+
+
+
+  const handleGoogleConnect = async () => {
+    try {
+      if (googleConnected) {
+        await disconnectGoogle()
+      } else {
+        await handleGoogleAuth()
+      }
+    } catch (error) {
+      console.error('Google auth error:', error)
+    }
+  }
+
+  // Context value
+  const googleAuthValue = {
+    googleAuth: googleConnected,
+    loading,
+    handleGoogleAuth,
+    disconnectGoogle,
+    refreshAuthStatus: checkGoogleAuthStatus
   }
 
   const modules = [
@@ -99,22 +133,38 @@ const Dashboard = () => {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <GoogleAuthContext.Provider value={googleAuthValue}>
+      <div style={{ minHeight: '100vh', background: '#F7F9FB' }}>
       {/* Header */}
       <header style={{
-        background: 'white',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        background: '#FFFFFF',
+        borderBottom: '1px solid #E5E5E5',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         padding: '1rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ fontSize: '2rem' }}>📊</div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#333' }}>
-            Pardot Analytics
-          </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            background: 'linear-gradient(135deg, #00396B, #0176D3)', 
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '1.25rem',
+            fontWeight: 'bold'
+          }}>P</div>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#00396B', margin: 0, lineHeight: 1 }}>
+              Pardot Analytics
+            </h1>
+            <p style={{ fontSize: '0.75rem', color: '#706E6B', margin: 0, lineHeight: 1 }}>Marketing Intelligence</p>
+          </div>
         </div>
 
         {/* Connection Status & Logout */}
@@ -125,19 +175,20 @@ const Dashboard = () => {
             alignItems: 'center',
             gap: '0.5rem',
             padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            background: pardotConnected ? '#dcfce7' : '#fee2e2',
-            color: pardotConnected ? '#166534' : '#dc2626',
-            fontSize: '0.9rem',
+            borderRadius: '6px',
+            background: pardotConnected ? '#E8F4FD' : '#FEF2F2',
+            border: `1px solid ${pardotConnected ? '#B8E6FF' : '#FECACA'}`,
+            color: pardotConnected ? '#00396B' : '#DC2626',
+            fontSize: '0.85rem',
             fontWeight: '600'
           }}>
             <div style={{
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: pardotConnected ? '#22c55e' : '#ef4444'
+              background: pardotConnected ? '#01d32fff' : '#EF4444'
             }}></div>
-            Pardot
+            Salesforce
           </div>
 
           {/* Google Connect/Disconnect Button */}
@@ -147,21 +198,28 @@ const Dashboard = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              background: googleConnected ? '#22c55e' : '#3b82f6',
+              background: googleConnected ? '#059669' : '#0176D3',
               color: 'white',
               border: 'none',
               padding: '0.5rem 1rem',
-              borderRadius: '8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '600'
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = googleConnected ? '#047857' : '#014486'
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = googleConnected ? '#059669' : '#0176D3'
             }}
           >
             <div style={{
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: googleConnected ? '#dcfce7' : '#ffffff'
+              background: googleConnected ? '#E8F4FD' : '#ffffff'
             }}></div>
             {googleConnected ? 'Disconnect Google' : 'Connect Google'}
           </button>
@@ -172,19 +230,23 @@ const Dashboard = () => {
         {/* Sidebar */}
         <aside style={{
           width: '280px',
-          background: 'white',
-          minHeight: 'calc(100vh - 80px)',
-          padding: '2rem 1rem',
-          boxShadow: '2px 0 4px rgba(0,0,0,0.1)'
+          background: '#FFFFFF',
+          minHeight: 'calc(100vh - 81px)',
+          padding: '1.5rem 1rem',
+          borderRight: '1px solid #E5E5E5',
+          boxShadow: '1px 0 3px rgba(0,0,0,0.05)'
         }}>
           <h3 style={{
-            fontSize: '1.1rem',
-            fontWeight: '600',
-            color: '#374151',
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            color: '#706E6B',
             marginBottom: '1.5rem',
-            textAlign: 'center'
+            textAlign: 'left',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            paddingLeft: '1rem'
           }}>
-            Modules
+            Analytics Modules
           </h3>
 
           <nav>
@@ -194,26 +256,28 @@ const Dashboard = () => {
                 onClick={() => navigate(module.path)}
                 style={{
                   width: '100%',
-                  padding: '1rem',
-                  margin: '0.5rem 0',
-                  border: 'none',
-                  borderRadius: '10px',
-                  background: activeModule === module.id ? '#3b82f6' : '#f8fafc',
-                  color: activeModule === module.id ? 'white' : '#374151',
+                  padding: '0.875rem 1rem',
+                  margin: '0.25rem 0',
+                  border: activeModule === module.id ? '1px solid #0176D3' : '1px solid transparent',
+                  borderRadius: '6px',
+                  background: activeModule === module.id ? '#E8F4FD' : 'transparent',
+                  color: activeModule === module.id ? '#00396B' : '#706E6B',
                   cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '500',
+                  fontSize: '0.9rem',
+                  fontWeight: activeModule === module.id ? '600' : '500',
                   textAlign: 'left',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.2s ease'
                 }}
                 onMouseOver={(e) => {
                   if (activeModule !== module.id) {
-                    e.target.style.background = '#e5e7eb'
+                    e.target.style.background = '#F7F9FB'
+                    e.target.style.color = '#00396B'
                   }
                 }}
                 onMouseOut={(e) => {
                   if (activeModule !== module.id) {
-                    e.target.style.background = '#f8fafc'
+                    e.target.style.background = 'transparent'
+                    e.target.style.color = '#706E6B'
                   }
                 }}
               >
@@ -227,12 +291,13 @@ const Dashboard = () => {
         <main style={{
           flex: 1,
           padding: '2rem',
-          background: '#f8fafc'
+          background: '#F7F9FB'
         }}>
           <Outlet />
         </main>
       </div>
     </div>
+    </GoogleAuthContext.Provider>
   )
 }
 

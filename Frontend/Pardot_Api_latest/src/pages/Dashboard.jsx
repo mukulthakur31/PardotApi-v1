@@ -13,6 +13,15 @@ const Dashboard = () => {
   useEffect(() => {
     // Check authentication on load
     checkAuth()
+    checkGoogleAuthStatus()
+    
+    // Check for Google auth callback
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('google_auth') === 'success') {
+      setGoogleConnected(true)
+      // Remove the parameter from URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
   }, [])
 
   const checkAuth = async () => {
@@ -27,21 +36,56 @@ const Dashboard = () => {
       }
       
       setPardotConnected(true)
-      // Check Google connection status here if needed
     } catch (error) {
       navigate('/')
     }
   }
 
-  const handleLogout = async () => {
+  const checkGoogleAuthStatus = async () => {
     try {
-      await fetch('http://localhost:4001/logout', {
-        method: 'POST',
+      const response = await fetch('http://localhost:4001/google-auth-status', {
         credentials: 'include'
       })
-      navigate('/')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setGoogleConnected(data.authenticated)
+      }
     } catch (error) {
-      navigate('/')
+      console.error('Error checking Google auth:', error)
+    }
+  }
+
+  const handleGoogleConnect = async () => {
+    if (googleConnected) {
+      // Disconnect Google
+      try {
+        const response = await fetch('http://localhost:4001/google-disconnect', {
+          method: 'POST',
+          credentials: 'include'
+        })
+        
+        if (response.ok) {
+          setGoogleConnected(false)
+        }
+      } catch (error) {
+        console.error('Error disconnecting Google:', error)
+      }
+    } else {
+      // Connect to Google
+      try {
+        const response = await fetch('http://localhost:4001/google-auth', {
+          credentials: 'include'
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          // Redirect to Google auth URL in same tab
+          window.location.href = data.auth_url
+        }
+      } catch (error) {
+        console.error('Error connecting to Google:', error)
+      }
     }
   }
 
@@ -96,32 +140,14 @@ const Dashboard = () => {
             Pardot
           </div>
 
-          {/* Google Status */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            borderRadius: '20px',
-            background: googleConnected ? '#dcfce7' : '#fee2e2',
-            color: googleConnected ? '#166534' : '#dc2626',
-            fontSize: '0.9rem',
-            fontWeight: '600'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: googleConnected ? '#22c55e' : '#ef4444'
-            }}></div>
-            Google
-          </div>
-
-          {/* Logout Button */}
+          {/* Google Connect/Disconnect Button */}
           <button
-            onClick={handleLogout}
+            onClick={handleGoogleConnect}
             style={{
-              background: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: googleConnected ? '#22c55e' : '#3b82f6',
               color: 'white',
               border: 'none',
               padding: '0.5rem 1rem',
@@ -131,7 +157,13 @@ const Dashboard = () => {
               fontWeight: '600'
             }}
           >
-            Logout
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: googleConnected ? '#dcfce7' : '#ffffff'
+            }}></div>
+            {googleConnected ? 'Disconnect Google' : 'Connect Google'}
           </button>
         </div>
       </header>

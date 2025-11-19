@@ -1,6 +1,7 @@
-from flask import Blueprint, request, jsonify, redirect, session
+from flask import Blueprint, request, jsonify, redirect, session, g
 from google_integration import GoogleIntegration
 from config.settings import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from middleware.auth_middleware import require_auth
 
 google_bp = Blueprint('google', __name__)
 
@@ -8,14 +9,13 @@ google_bp = Blueprint('google', __name__)
 google_integration = GoogleIntegration(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
 @google_bp.route("/google-auth", methods=["GET"])
+@require_auth
 def google_auth():
     try:
-        token = request.headers.get("Authorization")
-        if token:
-            session['pardot_token'] = token
-        
         auth_url, flow = google_integration.get_auth_url()
+        print("entered in google auth")
         return jsonify({"auth_url": auth_url})
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -23,23 +23,21 @@ def google_auth():
 def google_callback():
     try:
         code = request.args.get('code')
+        print(code)
         if not code:
             return jsonify({"error": "No code received"}), 400
         
         _, flow = google_integration.get_auth_url()
         credentials = google_integration.get_credentials(code, flow)
+        print(credentials)
         session['google_credentials'] = credentials.to_json()
         
-        stored_token = session.get('pardot_token', '')
-        redirect_url = 'http://localhost:5173/dashboard?google_auth=success'
-        if stored_token:
-            clean_token = stored_token.replace("Bearer ", "").replace("bearer ", "")
-            redirect_url += f'&token={clean_token}'
-        return redirect(redirect_url)
+        return redirect('http://localhost:5173/dashboard?google_auth=success')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @google_bp.route("/export-to-sheets", methods=["POST"])
+@require_auth
 def export_to_sheets():
     if not session.get('google_credentials'):
         return jsonify({"error": "Google authentication required"}), 401
@@ -71,3 +69,12 @@ def export_to_sheets():
 @google_bp.route("/google-auth-status", methods=["GET"])
 def google_auth_status():
     return jsonify({"authenticated": bool(session.get('google_credentials'))})
+
+@google_bp.route("/google-disconnect", methods=["POST"])
+@require_auth
+def google_disconnect():
+    try:
+        session.pop('google_credentials', None)
+        return jsonify({"success": True, "message": "Google account disconnected"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

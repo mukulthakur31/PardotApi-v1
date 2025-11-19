@@ -3,6 +3,7 @@ import jwt
 import time
 from config.settings import REDIRECT_URI, CLIENT_ID, CLIENT_SECRET, SECRET_KEY
 from services.salesforce_auth import SalesforceAuthService
+from middleware.auth_middleware import require_auth
 
 auth_bp = Blueprint('auth', __name__)
 auth_service = SalesforceAuthService()
@@ -56,36 +57,8 @@ def callback():
         return jsonify({"error": str(e)}), 400
 
 @auth_bp.route("/check-auth")
+@require_auth
 def check_auth():
     """Check if user is authenticated"""
-    jwt_token = request.cookies.get('auth_token')
-    
-    if not jwt_token:
-        return jsonify({"authenticated": False}), 401
-    
-    try:
-        # Decode JWT token
-        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=['HS256'])
-        token_ref = payload.get('token_ref')
-        
-        # Get actual token from auth service class
-        actual_token = auth_service.get_valid_access_token()
-        
-        # Match token reference with actual token
-        if not actual_token or not actual_token.startswith(token_ref):
-            return jsonify({"authenticated": False}), 401
-        
-        return jsonify({"authenticated": True})
-        
-    except jwt.ExpiredSignatureError:
-        return jsonify({"authenticated": False, "error": "Token expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"authenticated": False, "error": "Invalid token"}), 401
-    except Exception:
-        return jsonify({"authenticated": False}), 401
+    return jsonify({"authenticated": True})
 
-@auth_bp.route("/logout")
-def logout():
-    response = make_response(jsonify({"message": "Logged out"}))
-    response.set_cookie('auth_token', '', expires=0)
-    return response

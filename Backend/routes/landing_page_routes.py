@@ -1,16 +1,13 @@
 from flask import Blueprint, request, jsonify, g
 from services.Landing_page_service import get_landing_page_stats, get_filtered_landing_page_stats, get_date_range_from_filter
 from middleware.auth_middleware import require_auth
+from cache import get_cached_data, set_cached_data
 
 landing_page_bp = Blueprint('landing_page', __name__)
-
-# Import shared data_cache
-from shared import data_cache
 
 @landing_page_bp.route("/get-landing-page-stats", methods=["GET"])
 @require_auth
 def get_landing_page_stats_route():
-    
     try:
         filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
@@ -20,7 +17,7 @@ def get_landing_page_stats_route():
             start_date, end_date = get_date_range_from_filter(filter_type)
         
         landing_page_stats = get_landing_page_stats(g.access_token, start_date, end_date)
-        data_cache['landing_pages'][g.access_token] = landing_page_stats
+        set_cached_data(f"landing_pages:{g.access_token[:20]}", landing_page_stats, ttl=1800)
         return jsonify(landing_page_stats)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -28,7 +25,6 @@ def get_landing_page_stats_route():
 @landing_page_bp.route("/get-filtered-landing-page-stats", methods=["GET"])
 @require_auth
 def get_filtered_landing_page_stats_route():
-    
     try:
         filter_type = request.args.get("filter_type")
         start_date = request.args.get("start_date")
@@ -42,17 +38,16 @@ def get_filtered_landing_page_stats_route():
 @landing_page_bp.route("/get-landing-page-field-issues", methods=["GET"])
 @require_auth
 def get_landing_page_field_issues():
-    
     try:
         severity = request.args.get("severity", "all").lower()
         issue_type = request.args.get("type", "all").lower()
         
-        cached_stats = data_cache['landing_pages'].get(g.access_token)
+        cached_stats = get_cached_data(f"landing_pages:{g.access_token[:20]}")
         if cached_stats:
             landing_page_stats = cached_stats
         else:
             landing_page_stats = get_landing_page_stats(g.access_token)
-            data_cache['landing_pages'][g.access_token] = landing_page_stats
+            set_cached_data(f"landing_pages:{g.access_token[:20]}", landing_page_stats, ttl=1800)
             
         field_issues = landing_page_stats.get('field_mapping_issues', {})
         

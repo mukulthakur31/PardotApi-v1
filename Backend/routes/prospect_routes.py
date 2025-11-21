@@ -1,24 +1,20 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, g
 from services.prospect_service import (
     get_prospect_health, find_duplicate_prospects, find_inactive_prospects, 
     find_missing_critical_fields
 )
 from datetime import datetime, timedelta
+from cache import get_cached_data, set_cached_data
+from middleware.auth_middleware import require_auth
 
 prospect_bp = Blueprint('prospect', __name__)
-
-# Import shared data_cache
-from shared import data_cache
-
-from middleware.auth_middleware import require_auth
-from flask import g
 
 @prospect_bp.route("/get-prospect-health", methods=["GET"])
 @require_auth
 def get_prospect_health_route():
     try:
         health_data = get_prospect_health(g.access_token)
-        data_cache['prospects'][g.access_token] = health_data
+        set_cached_data(f"prospects:{g.access_token[:20]}", health_data, ttl=1800)
         return jsonify(health_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -27,8 +23,7 @@ def get_prospect_health_route():
 @require_auth
 def get_inactive_prospects():
     try:
-        access_token = g.access_token
-        cached_health = data_cache['prospects'].get(access_token)
+        cached_health = get_cached_data(f"prospects:{g.access_token[:20]}")
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
             inactive_prospects = find_inactive_prospects(prospects)
@@ -46,8 +41,7 @@ def get_inactive_prospects():
 @require_auth
 def get_duplicate_prospects():
     try:
-        access_token = g.access_token
-        cached_health = data_cache['prospects'].get(access_token)
+        cached_health = get_cached_data(f"prospects:{g.access_token[:20]}")
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
             duplicates = find_duplicate_prospects(prospects)
@@ -65,8 +59,7 @@ def get_duplicate_prospects():
 @require_auth
 def get_missing_fields_prospects():
     try:
-        access_token = g.access_token
-        cached_health = data_cache['prospects'].get(access_token)
+        cached_health = get_cached_data(f"prospects:{g.access_token[:20]}")
         if cached_health and 'all_prospects' in cached_health:
             prospects = cached_health['all_prospects']
             missing_fields = find_missing_critical_fields(prospects)
@@ -86,11 +79,9 @@ def filter_prospects_route():
     try:
         filters = request.json or {}
         
-        if not data_cache['prospects']:
+        cached_health = get_cached_data(f"prospects:{g.access_token[:20]}")
+        if not cached_health:
             return jsonify({"error": "Please run prospect health analysis first"}), 400
-        
-        cached_key = list(data_cache['prospects'].keys())[0]
-        cached_health = data_cache['prospects'][cached_key]
         
         if 'all_prospects' not in cached_health:
             return jsonify({"error": "Cached data missing all_prospects"}), 400

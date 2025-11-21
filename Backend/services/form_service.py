@@ -51,7 +51,7 @@ def fetch_all_activities(headers, created_after=None, created_before=None):
     return all_activities
 
 
-def calculate_form_stats(form, activities_by_form):
+def calculate_form_stats(form, activities_by_form, all_activities):
     """Calculate statistics for a single form"""
     form_id = str(form["id"])
     form_activities = activities_by_form.get(form_id, [])
@@ -69,7 +69,40 @@ def calculate_form_stats(form, activities_by_form):
     total_submissions = len(submissions)
     abandoned = total_views - total_submissions if total_views > total_submissions else 0
     abandonment_rate = (abandoned / total_views * 100) if total_views > 0 else 0
-    conversion_rate = (total_submissions / total_views * 100) if total_views > 0 else 0
+    
+    # Calculate conversions: Count submissions where this is the first activity of that prospect
+    conversions = 0
+    for submission in submissions:
+        prospect_id = submission.get("prospect_id") or submission.get("visitor_id")
+        if not prospect_id:
+            continue
+        
+        # Get all activities for this prospect
+        prospect_activities = [a for a in all_activities if 
+                              (a.get("prospect_id") == prospect_id or a.get("visitor_id") == prospect_id)]
+        
+        if not prospect_activities:
+            continue
+        
+        # Sort by created_at to find the first activity
+        try:
+            sorted_activities = sorted(prospect_activities, key=lambda x: 
+                                      datetime.fromisoformat(x.get("created_at", "").replace('Z', '+00:00')) 
+                                      if x.get("created_at") else datetime.min)
+            
+            # Check if this submission is the first activity
+
+            first = sorted_activities[0]
+            if (
+                first.get("id") == submission.get("id") 
+                and first.get("type") == 4
+                and first.get("created_at") == submission.get("created_at")
+                ):
+                conversions += 1
+
+           
+        except:
+            continue
     
     # Check if form is active (has activity in last 30 days)
     thirty_days_ago = datetime.now() - timedelta(days=30)
@@ -89,8 +122,7 @@ def calculate_form_stats(form, activities_by_form):
         "abandonment_rate": round(abandonment_rate, 2),
         "clicks": len(clicks),
         "unique_clicks": get_unique_count(clicks),
-        "conversions": len([a for a in submissions if a.get("prospect_id")]),
-        "conversion_rate": round(conversion_rate, 2),
+        "conversions": conversions,
         "is_active": is_active,
         "last_activity": max([a.get("created_at") for a in form_activities], default=None) if form_activities else None
     }
@@ -153,7 +185,7 @@ def get_form_stats(access_token, created_after=None, created_before=None):
         
         # Calculate stats in parallel
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(calculate_form_stats, form, activities_by_form) for form in forms]
+            futures = [executor.submit(calculate_form_stats, form, activities_by_form, activities) for form in forms]
             form_stats = [future.result() for future in futures]
         
         # Filter out forms with no activities if date filters are applied
@@ -298,7 +330,7 @@ def get_active_inactive_forms_from_cache(form_stats):
         "summary": {
             "total_forms": len(form_stats),
             "active_percentage": round((len(active_forms) / len(form_stats) * 100), 2) if form_stats else 0,
-            "avg_conversion_rate_active": round(sum(f["conversion_rate"] for f in active_forms) / len(active_forms), 2) if active_forms else 0,
-            "avg_conversion_rate_inactive": round(sum(f["conversion_rate"] for f in inactive_forms) / len(inactive_forms), 2) if inactive_forms else 0
+            "total_conversions_active": sum(f["conversions"] for f in active_forms),
+            "total_conversions_inactive": sum(f["conversions"] for f in inactive_forms)
         }
     }

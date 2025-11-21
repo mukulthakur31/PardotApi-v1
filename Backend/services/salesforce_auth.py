@@ -9,6 +9,7 @@ class SalesforceAuthService:
         "refresh_token": None,
         "expires_at": None
     }
+ 
     
     def __new__(cls):
         if cls._instance is None:

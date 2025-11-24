@@ -51,7 +51,7 @@ def fetch_all_activities(headers, created_after=None, created_before=None):
     return all_activities
 
 
-def calculate_form_stats(form, activities_by_form, all_activities):
+def calculate_form_stats(form, activities_by_form, headers, prospect_cache):
     """Calculate statistics for a single form"""
     form_id = str(form["id"])
     form_activities = activities_by_form.get(form_id, [])
@@ -70,44 +70,52 @@ def calculate_form_stats(form, activities_by_form, all_activities):
     abandoned = total_views - total_submissions if total_views > total_submissions else 0
     abandonment_rate = (abandoned / total_views * 100) if total_views > 0 else 0
     
-    # Calculate conversions: Count submissions where this is the first activity of that prospect
+    # Calculate conversions: A submission is a conversion only if the prospect had no prior activities
     conversions = 0
     for submission in submissions:
-        prospect_id = submission.get("prospect_id") or submission.get("visitor_id")
+        prospect_id = submission.get("prospect_id")
         if not prospect_id:
             continue
         
-        # Get all activities for this prospect
-        prospect_activities = [a for a in all_activities if 
-                              (a.get("prospect_id") == prospect_id or a.get("visitor_id") == prospect_id)]
-        
-        if not prospect_activities:
+        submission_date = submission.get("created_at")
+        if not submission_date:
             continue
         
-        # Sort by created_at to find the first activity
-        try:
-            sorted_activities = sorted(prospect_activities, key=lambda x: 
-                                      datetime.fromisoformat(x.get("created_at", "").replace('Z', '+00:00')) 
-                                      if x.get("created_at") else datetime.min)
-            
-            # Check if this submission is the first activity
+        # Check if this prospect has any activities before this submission
+        prospect_activities = prospect_cache.get(prospect_id)
+        if prospect_activities is None:
+            # Fetch all activities for this prospect
+            params = {"format": "json", "prospect_id": prospect_id, "limit": 200}
+            response = requests.get(
+                "https://pi.pardot.com/api/visitorActivity/version/4/do/query",
+                headers=headers, params=params
+            )
+            if response.status_code == 200:
+                result = response.json().get("result", {})
+                prospect_activities = result.get("visitor_activity", [])
+                # Ensure it's a list
+                if not isinstance(prospect_activities, list):
+                    prospect_activities = [prospect_activities] if prospect_activities else []
+                prospect_cache[prospect_id] = prospect_activities
+            else:
+                prospect_cache[prospect_id] = []
+                prospect_activities = []
+        
+        # Check if any activity exists before this submission date
+        has_prior_activity = any(
+            isinstance(a, dict) and a.get("created_at") and a.get("created_at") < submission_date
+            for a in prospect_activities
+        )
+        
+        if not has_prior_activity:
+            conversions += 1
 
-            first = sorted_activities[0]
-            if (
-                first.get("id") == submission.get("id") 
-                and first.get("type") == 4
-                and first.get("created_at") == submission.get("created_at")
-                ):
-                conversions += 1
-
-           
-        except:
-            continue
+    
     
     # Check if form is active (has activity in last 30 days)
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    thirty_days_ago = datetime.now()
     recent_activities = [a for a in form_activities if a.get("created_at") and 
-                        datetime.fromisoformat(a["created_at"].replace('Z', '+00:00')) > thirty_days_ago]
+                        datetime.fromisoformat(a["created_at"].replace('Z', '+00:00')).replace(tzinfo=None) > (thirty_days_ago - timedelta(days=30))]
     is_active = len(recent_activities) > 0
     
     return {
@@ -183,10 +191,17 @@ def get_form_stats(access_token, created_after=None, created_before=None):
         
         print(f"Activities grouped by {len(activities_by_form)} forms")
         
-        # Calculate stats in parallel
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(calculate_form_stats, form, activities_by_form, activities) for form in forms]
-            form_stats = [future.result() for future in futures]
+        # Create prospect cache to avoid duplicate API calls
+        prospect_cache = {}
+        
+        # Calculate stats sequentially to manage API rate limits
+        form_stats = []
+        for form in forms:
+            try:
+                stats = calculate_form_stats(form, activities_by_form, headers, prospect_cache)
+                form_stats.append(stats)
+            except Exception as e:
+                print(f"Error calculating stats for form {form.get('id')}: {e}")
         
         # Filter out forms with no activities if date filters are applied
         if created_after or created_before:
